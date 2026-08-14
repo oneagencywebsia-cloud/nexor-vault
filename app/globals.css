@@ -1,0 +1,103 @@
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap");
+@import "tailwindcss";
+
+:root {
+  /* Paleta Nexor */
+  --nexor-void: #0b0d10; /* fondo base */
+  --nexor-surface: #151821; /* superficie elevada (cards, sheets) */
+  --nexor-surface-2: #1c2029; /* superficie sobre superficie (modales, inputs) */
+  --nexor-line: rgba(233, 233, 237, 0.08); /* bordes sutiles */
+  --nexor-line-strong: rgba(233, 233, 237, 0.16);
+  --nexor-purple: #6c5ce7; /* primario */
+  --nexor-purple-bright: #8b7cf6;
+  --nexor-lavender: #b8b3ff; /* acento claro */
+  --nexor-mist: #e9e9ed; /* texto secundario sobre oscuro */
+  --nexor-white: #ffffff;
+  --nexor-text: #f3f3f6;
+  --nexor-text-dim: #9a9ba8;
+  --nexor-success: #34d399;
+  --nexor-warning: #fbbf24;
+  --nexor-danger: #fb7185;
+
+  --background: var(--nexor-void);
+  --foreground: var(--nexor-text);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-void: var(--nexor-void);
+  --color-surface: var(--nexor-surface);
+  --color-surface-2: var(--nexor-surface-2);
+  --color-line: var(--nexor-line);
+  --color-line-strong: var(--nexor-line-strong);
+  --color-purple: var(--nexor-purple);
+  --color-purple-bright: var(--nexor-purple-bright);
+  --color-lavender: var(--nexor-lavender);
+  --color-mist: var(--nexor-mist);
+  --color-dim: var(--nexor-text-dim);
+  --color-success: var(--nexor-success);
+  --color-warning: var(--nexor-warning);
+  --color-danger: var(--nexor-danger);
+  --font-sans: "Satoshi", "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  background: var(--nexor-void);
+  /* deja que la web app "respire" bajo el notch/home-indicator en iOS standalone */
+  height: -webkit-fill-available;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: -webkit-fill-available;
+  min-height: 100vh;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: var(--nexor-purple);
+  color: white;
+}
+
+/* Scrollbar discreto, coherente con superficies oscuras */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--nexor-surface-2);
+  border-radius: 999px;
+  border: 2px solid var(--nexor-void);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Fondo con textura de red — eco del patrón de marca (nodos + líneas) */
+.nexor-mesh-bg {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.16), transparent 40%),
+    radial-gradient(circle at 85% 0%, rgba(184, 179, 255, 0.12), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(108, 92, 231, 0.1), transparent 50%);
+}
+
+.nexor-glass {
+  background: rgba(21, 24, 33, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
