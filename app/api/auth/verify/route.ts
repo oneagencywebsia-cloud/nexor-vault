@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { checkRateLimit, clearAttempts, recordFailedAttempt } from '@/lib/rate-limit';
 
 function safeCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -22,6 +23,15 @@ export async function POST(req: NextRequest) {
   const authHash = String(body.authHash || '');
   if (!authHash) return NextResponse.json({ error: 'Falta authHash' }, { status: 400 });
 
+  const rateLimitId = `unlock:${session.userId}`;
+  const rate = await checkRateLimit(rateLimitId);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: 'Demasiados intentos. Inténtalo de nuevo en unos minutos.' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } },
+    );
+  }
+
   const { data: user } = await supabaseAdmin
     .from('app_users')
     .select('auth_hash')
@@ -29,8 +39,10 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!user || !safeCompare(user.auth_hash, authHash)) {
+    await recordFailedAttempt(rateLimitId);
     return NextResponse.json({ error: 'Master password incorrecto' }, { status: 401 });
   }
 
+  await clearAttempts(rateLimitId);
   return NextResponse.json({ ok: true });
 }
