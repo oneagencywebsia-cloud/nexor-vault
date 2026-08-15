@@ -355,6 +355,53 @@ export default function VaultPage() {
     setMovingFolderId(null);
   }
 
+  // Mueve una carpeta ENTERA (y sus subcarpetas) a un equipo: re-cifra cada
+  // item del subárbol con la team key y lo crea allí; solo si todos se
+  // crean sin errores se borran del vault personal y se elimina la carpeta
+  // (el cascade de Postgres se lleva las subcarpetas). Si algo falla a
+  // medio camino, no se borra nada — puede quedar algún item duplicado en
+  // el equipo, pero nunca se pierde nada del vault personal.
+  async function onMoveFolderToTeam(folderId: string, team: { id: string; wrappedTeamKey: string }) {
+    if (!vaultKey) return;
+    const subtree = collectDescendants(folderId, folders);
+    const itemsToMove = items.filter((i) => i.folderId && subtree.has(i.folderId));
+
+    setMoveToTeamBusy(true);
+    setMoveToTeamError(null);
+    try {
+      const meRes = await fetch('/api/auth/me');
+      const { user } = await meRes.json();
+      if (!user?.encryptedPrivateKey) throw new Error('Aún no tienes claves de compartir configuradas');
+      const teamKey = await unwrapRawKey(vaultKey, user.encryptedPrivateKey, team.wrappedTeamKey);
+
+      for (const item of itemsToMove) {
+        const encryptedBlob = await encryptJson(teamKey, item.data);
+        const res = await fetch(`/api/teams/${team.id}/items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemType: 'login', encryptedBlob }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `No se pudo mover "${item.data.title || 'un item'}"`);
+      }
+
+      await Promise.all(itemsToMove.map((item) => fetch(`/api/vault/items/${item.id}`, { method: 'DELETE' })));
+      await fetch(`/api/vault/folders/${folderId}`, { method: 'DELETE' });
+
+      const movedIds = new Set(itemsToMove.map((i) => i.id));
+      setItems((prev) => prev.filter((i) => !movedIds.has(i.id)));
+      setFolders((prev) => prev.filter((f) => !subtree.has(f.id)));
+      if (activeFolderId && subtree.has(activeFolderId)) {
+        setActiveFolderId(folderMap.get(folderId)?.parentId ?? null);
+      }
+      setMovingFolderId(null);
+    } catch (err) {
+      setMoveToTeamError(err instanceof Error ? err.message : 'Error inesperado');
+    } finally {
+      setMoveToTeamBusy(false);
+    }
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (!vaultKey) return;
@@ -761,6 +808,7 @@ export default function VaultPage() {
             </button>
             <button
               onClick={() => {
+                setMoveToTeamError(null);
                 setMovingFolderId(actionFolderId);
                 setActionFolderId(null);
               }}
@@ -813,11 +861,11 @@ export default function VaultPage() {
         </div>
       )}
 
-      {/* mover carpeta: lista plana con indentación por profundidad */}
+      {/* mover carpeta: a otra carpeta/raíz, o a un equipo entero */}
       {movingFolderId && (
         <div
           className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
-          onClick={() => setMovingFolderId(null)}
+          onClick={() => !moveToTeamBusy && setMovingFolderId(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -831,11 +879,36 @@ export default function VaultPage() {
               currentParentId={folderMap.get(movingFolderId)?.parentId ?? null}
               onPick={(newParentId) => onMoveFolder(movingFolderId, newParentId)}
             />
+
+            {writeableTeams.length > 0 && (
+              <>
+                <p className="mb-1 mt-3 px-2 text-[11.5px] font-semibold uppercase tracking-wide text-dim">
+                  O mover a un equipo
+                </p>
+                <p className="mb-1 px-2 text-[11.5px] text-dim">
+                  Se mueven todos los items de esta carpeta (y subcarpetas) y la carpeta desaparece.
+                </p>
+                {writeableTeams.map((team) => (
+                  <button
+                    key={team.id}
+                    disabled={moveToTeamBusy}
+                    onClick={() => onMoveFolderToTeam(movingFolderId, team)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] font-medium text-foreground active:bg-surface-2 disabled:opacity-50"
+                  >
+                    <Users2 size={16} /> {team.name}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {moveToTeamError && <p className="px-2 text-[13px] text-danger">{moveToTeamError}</p>}
+
             <button
               onClick={() => setMovingFolderId(null)}
-              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
+              disabled={moveToTeamBusy}
+              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground disabled:opacity-50"
             >
-              Cancelar
+              {moveToTeamBusy ? 'Moviendo…' : 'Cancelar'}
             </button>
           </div>
         </div>
