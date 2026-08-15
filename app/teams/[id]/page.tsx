@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Pencil, Trash2, UserPlus, Plus } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Plus, Check, X } from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { unwrapRawKey, wrapRawKey } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
@@ -57,7 +57,13 @@ export default function TeamDetailPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameBusy, setNameBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const canWrite = myRole === 'owner' || myRole === 'editor';
+  const isOwner = myRole === 'owner';
 
   useEffect(() => {
     if (unlocked) return;
@@ -192,6 +198,46 @@ export default function TeamDetailPage() {
     }
   }
 
+  function startEditName() {
+    setNameDraft(teamName);
+    setEditingName(true);
+  }
+
+  async function onSaveName() {
+    const name = nameDraft.trim();
+    if (!name || name === teamName) {
+      setEditingName(false);
+      return;
+    }
+    setNameBusy(true);
+    try {
+      const res = await fetch(`/api/teams/${teamId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTeamName(data.team.name);
+      setEditingName(false);
+    } catch {
+      // el nombre se queda como estaba si falla; el usuario puede reintentar
+    } finally {
+      setNameBusy(false);
+    }
+  }
+
+  async function onDeleteTeam() {
+    if (!confirm(`¿Eliminar el equipo "${teamName}"? Se borrará para todos los miembros y no se puede deshacer.`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/teams/${teamId}`, { method: 'DELETE' });
+    if (res.ok) {
+      router.push('/teams');
+    } else {
+      setDeleting(false);
+    }
+  }
+
   const memberList = useMemo(() => members, [members]);
 
   if (!unlocked || !vaultKey || loading) {
@@ -262,6 +308,58 @@ export default function TeamDetailPage() {
           ))}
         </ul>
       </section>
+
+      {isOwner && (
+        <section className="mb-8">
+          <p className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wide text-dim">Ajustes del equipo</p>
+          <div className="space-y-3 rounded-2xl border border-line bg-surface/70 p-4">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && onSaveName()}
+                  className={`${inputClass} flex-1`}
+                />
+                <button
+                  onClick={onSaveName}
+                  disabled={nameBusy}
+                  aria-label="Guardar nombre"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-purple text-white"
+                >
+                  <Check size={16} />
+                </button>
+                <button
+                  onClick={() => setEditingName(false)}
+                  aria-label="Cancelar"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line-strong text-dim"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-[13.5px] text-foreground">{teamName}</span>
+                <button
+                  onClick={startEditName}
+                  className="flex items-center gap-1.5 rounded-xl border border-line-strong px-3 py-2 text-[12.5px] font-semibold text-foreground active:scale-95"
+                >
+                  <Pencil size={14} /> Renombrar
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={onDeleteTeam}
+              disabled={deleting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-danger/30 py-2.5 text-[13px] font-semibold text-danger active:scale-95"
+            >
+              <Trash2 size={15} /> {deleting ? 'Eliminando…' : 'Eliminar equipo'}
+            </button>
+          </div>
+        </section>
+      )}
 
       {myRole === 'owner' && (
         <section>
