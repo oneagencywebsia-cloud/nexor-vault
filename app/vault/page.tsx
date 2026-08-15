@@ -21,9 +21,10 @@ import {
   MoreHorizontal,
   FolderInput,
   Check,
+  Users2,
 } from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
-import { encryptPrivateKey, generateKeyPair } from '@/lib/sharing';
+import { encryptPrivateKey, generateKeyPair, unwrapRawKey } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
 import { matchBrandIcon } from '@/lib/brand-icon';
 import AutoLock from '@/components/AutoLock';
@@ -105,6 +106,10 @@ export default function VaultPage() {
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
+  const [writeableTeams, setWriteableTeams] = useState<{ id: string; name: string; wrappedTeamKey: string }[]>([]);
+  const [movingItemId, setMovingItemId] = useState<string | null>(null);
+  const [moveToTeamBusy, setMoveToTeamBusy] = useState(false);
+  const [moveToTeamError, setMoveToTeamError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -170,6 +175,30 @@ export default function VaultPage() {
         }
       }
       if (!cancelled) setFolders(decrypted);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked, vaultKey]);
+
+  // Equipos donde el usuario puede escribir (owner/editor) — para poder
+  // mover items del vault personal al vault de un equipo.
+  useEffect(() => {
+    if (!unlocked || !vaultKey) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch('/api/teams');
+      if (!res.ok) return;
+      const { teams: raw } = (await res.json()) as {
+        teams: { role: string; wrapped_team_key: string; team: { id: string; name: string } | { id: string; name: string }[] }[];
+      };
+      const list = (raw ?? [])
+        .filter((r) => r.role === 'owner' || r.role === 'editor')
+        .map((r) => {
+          const team = Array.isArray(r.team) ? r.team[0] : r.team;
+          return { id: team.id, name: team.name, wrappedTeamKey: r.wrapped_team_key };
+        });
+      if (!cancelled) setWriteableTeams(list);
     })();
     return () => {
       cancelled = true;
@@ -370,6 +399,42 @@ export default function VaultPage() {
     if (!confirm('¿Borrar este item del vault?')) return;
     const res = await fetch(`/api/vault/items/${id}`, { method: 'DELETE' });
     if (res.ok) setItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  // Mueve un item del vault personal al vault de un equipo: se re-cifra
+  // localmente con la team key (desenvuelta con la clave privada propia)
+  // y solo entonces se crea allí y se borra del vault personal — el
+  // server nunca ve el item en claro en ningún punto del proceso.
+  async function onMoveToTeam(itemId: string, team: { id: string; wrappedTeamKey: string }) {
+    if (!vaultKey) return;
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    setMoveToTeamBusy(true);
+    setMoveToTeamError(null);
+    try {
+      const meRes = await fetch('/api/auth/me');
+      const { user } = await meRes.json();
+      if (!user?.encryptedPrivateKey) throw new Error('Aún no tienes claves de compartir configuradas');
+
+      const teamKey = await unwrapRawKey(vaultKey, user.encryptedPrivateKey, team.wrappedTeamKey);
+      const encryptedBlob = await encryptJson(teamKey, item.data);
+
+      const createRes = await fetch(`/api/teams/${team.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType: 'login', encryptedBlob }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) throw new Error(createData.error || 'No se pudo mover al equipo');
+
+      await fetch(`/api/vault/items/${itemId}`, { method: 'DELETE' });
+      setItems((prev) => prev.filter((i) => i.id !== itemId));
+      setMovingItemId(null);
+    } catch (err) {
+      setMoveToTeamError(err instanceof Error ? err.message : 'Error inesperado');
+    } finally {
+      setMoveToTeamBusy(false);
+    }
   }
 
   async function onLogout() {
@@ -574,6 +639,11 @@ export default function VaultPage() {
                 <IconBtn onClick={() => openEdit(item)} label="Editar">
                   <Pencil size={15} />
                 </IconBtn>
+                {writeableTeams.length > 0 && (
+                  <IconBtn onClick={() => setMovingItemId(item.id)} label="Mover a equipo">
+                    <Users2 size={15} />
+                  </IconBtn>
+                )}
                 <IconBtn onClick={() => onDelete(item.id)} label="Borrar" danger>
                   <Trash2 size={15} />
                 </IconBtn>
@@ -766,6 +836,43 @@ export default function VaultPage() {
               className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
             >
               Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* mover item del vault personal al vault de un equipo */}
+      {movingItemId && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          onClick={() => !moveToTeamBusy && setMovingItemId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="safe-bottom max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-t-[28px] border border-line bg-surface p-4 sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">Mover a equipo…</p>
+            <p className="mb-2 px-2 text-[12px] text-dim">
+              Se cifrará con la clave del equipo y desaparecerá de tu vault personal.
+            </p>
+            {writeableTeams.map((team) => (
+              <button
+                key={team.id}
+                disabled={moveToTeamBusy}
+                onClick={() => onMoveToTeam(movingItemId, team)}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] font-medium text-foreground active:bg-surface-2 disabled:opacity-50"
+              >
+                <Users2 size={16} /> {team.name}
+              </button>
+            ))}
+            {moveToTeamError && <p className="px-2 text-[13px] text-danger">{moveToTeamError}</p>}
+            <button
+              onClick={() => setMovingItemId(null)}
+              disabled={moveToTeamBusy}
+              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground disabled:opacity-50"
+            >
+              {moveToTeamBusy ? 'Moviendo…' : 'Cancelar'}
             </button>
           </div>
         </div>
