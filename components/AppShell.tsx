@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRef, useState } from 'react';
 import { Lock, Share2, ShieldCheck, Users2, Settings2 } from 'lucide-react';
 import { NexorMark } from './NexorLogo';
 import PushSetup from './PushSetup';
@@ -33,23 +34,76 @@ export function TopBar({ title, subtitle, right }: { title: string; subtitle?: s
 
 export function BottomTabBar() {
   const pathname = usePathname();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [glow, setGlow] = useState<{ x: number; visible: boolean }>({ x: 0, visible: false });
+  const [poppedHref, setPoppedHref] = useState<string | null>(null);
+
+  const activeIndex = Math.max(
+    0,
+    TABS.findIndex(({ href }) => pathname === href || pathname?.startsWith(href + '/')),
+  );
+  const pillPercent = 100 / TABS.length;
+
+  function moveGlow(clientX: number) {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setGlow({ x: clientX - rect.left, visible: true });
+  }
+
+  function pop(href: string) {
+    setPoppedHref(href);
+    window.setTimeout(() => setPoppedHref((cur) => (cur === href ? null : cur)), 420);
+  }
+
   return (
-    <nav className="safe-bottom nexor-glass fixed inset-x-0 bottom-0 z-30 border-t border-line">
-      <div className="mx-auto flex max-w-2xl items-stretch justify-between px-2 pt-1.5">
+    <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-2.5">
+      <div
+        ref={containerRef}
+        onPointerDown={(e) => moveGlow(e.clientX)}
+        onPointerMove={(e) => {
+          if (e.buttons > 0 || e.pointerType === 'touch') moveGlow(e.clientX);
+        }}
+        onPointerUp={() => setGlow((g) => ({ ...g, visible: false }))}
+        onPointerLeave={() => setGlow((g) => ({ ...g, visible: false }))}
+        className="nexor-liquid-glass relative mx-auto flex w-full max-w-md items-stretch justify-between overflow-hidden rounded-[26px] px-1.5 py-1.5"
+      >
+        {/* brillo que sigue al dedo */}
+        <div
+          className="nexor-touch-glow pointer-events-none absolute top-0 left-0 h-full w-20"
+          style={{
+            transform: `translateX(${glow.x - 40}px)`,
+            opacity: glow.visible ? 1 : 0,
+          }}
+        />
+
+        {/* píldora activa, se desliza entre pestañas con rebote */}
+        <div
+          className="nexor-active-pill absolute inset-y-1.5 rounded-[19px] bg-purple/20"
+          style={{
+            width: `calc(${pillPercent}% - 6px)`,
+            left: `calc(${activeIndex * pillPercent}% + 3px)`,
+          }}
+        />
+
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + '/');
           return (
             <Link
               key={href}
               href={href}
-              className="flex flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-1.5 transition-colors active:bg-surface-2"
+              onClick={() => pop(href)}
+              className={`relative z-10 flex flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-1.5 transition-transform active:scale-90 ${
+                poppedHref === href ? 'nexor-tab-pop' : ''
+              }`}
             >
               <Icon
                 size={22}
                 strokeWidth={active ? 2.4 : 1.8}
-                className={active ? 'text-purple' : 'text-dim'}
+                className={`transition-colors ${active ? 'text-purple' : 'text-dim'}`}
               />
-              <span className={`text-[10px] font-medium ${active ? 'text-purple' : 'text-dim'}`}>{label}</span>
+              <span className={`text-[10px] font-medium transition-colors ${active ? 'text-purple' : 'text-dim'}`}>
+                {label}
+              </span>
             </Link>
           );
         })}

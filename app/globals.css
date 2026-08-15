@@ -95,6 +95,44 @@ body {
   backdrop-filter: blur(20px) saturate(150%);
 }
 
+/* Liquid Glass (iOS 26): vidrio refractivo translúcido, blur + saturación
+   altas, con un filo superior de luz para simular el reflejo del borde. */
+.nexor-liquid-glass {
+  background: linear-gradient(180deg, rgba(32, 36, 46, 0.5), rgba(18, 21, 29, 0.68));
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 16px 44px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* Píldora activa que se desliza entre pestañas con rebote elástico. */
+.nexor-active-pill {
+  transition: left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Brillo que sigue al dedo mientras se desliza por la barra. */
+.nexor-touch-glow {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 70%);
+  transition: opacity 0.25s ease, transform 0.12s linear;
+}
+
+@keyframes nexor-tab-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.8);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.nexor-tab-pop {
+  animation: nexor-tab-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
