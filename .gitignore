@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generado por scripts/generate-brand-icons.mjs (predev/prebuild) a partir
+# de simple-icons — no se commitea, se regenera siempre desde node_modules
+/public/brand-icons/
+/lib/generated/

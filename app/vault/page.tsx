@@ -25,9 +25,11 @@ import {
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { encryptPrivateKey, generateKeyPair } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
+import { matchBrandIcon } from '@/lib/brand-icon';
 import AutoLock from '@/components/AutoLock';
 import PasswordGenerator from '@/components/PasswordGenerator';
 import { AppShell } from '@/components/AppShell';
+import { BrandIcon } from '@/components/BrandIcon';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 interface VaultItemData {
@@ -453,7 +455,8 @@ export default function VaultPage() {
           {(childFolders.length > 0 || true) && (
             <div className="mb-5 grid grid-cols-3 gap-2.5">
               {childFolders.map((f) => {
-                const tone = avatarTone(f.id);
+                const brand = matchBrandIcon(f.name);
+                const tone = brand?.hex ?? avatarTone(f.id);
                 const stats = folderStats(f.id);
                 return (
                   <div
@@ -472,7 +475,11 @@ export default function VaultPage() {
                         className="grid h-11 w-11 place-items-center rounded-2xl"
                         style={{ background: `${tone}26`, color: tone }}
                       >
-                        <FolderOpen size={20} />
+                        {brand ? (
+                          <BrandIcon slug={brand.slug} className="block h-5 w-5 [&_svg]:h-full [&_svg]:w-full" />
+                        ) : (
+                          <FolderOpen size={20} />
+                        )}
                       </div>
                       <span className="max-w-full truncate text-[12.5px] font-semibold text-foreground">{f.name}</span>
                       <span className="text-[10.5px] text-dim">
