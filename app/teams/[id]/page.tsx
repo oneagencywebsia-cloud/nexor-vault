@@ -24,6 +24,7 @@ import { collectDescendants, type FolderNode } from '@/lib/folder-tree';
 import { AppShell } from '@/components/AppShell';
 import { BrandIcon } from '@/components/BrandIcon';
 import { FolderPicker } from '@/components/FolderPicker';
+import { TotpCode } from '@/components/TotpCode';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 interface VaultItemData {
@@ -32,6 +33,7 @@ interface VaultItemData {
   password: string;
   url: string;
   notes: string;
+  totpSecret?: string;
 }
 
 interface DecryptedItem {
@@ -47,7 +49,7 @@ interface Member {
   user: { email: string } | { email: string }[];
 }
 
-const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '' };
+const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '', totpSecret: '' };
 const AVATAR_TONES = ['#6c5ce7', '#8b7cf6', '#b8b3ff', '#34d399', '#fbbf24', '#fb7185'];
 
 function avatarTone(seed: string) {
@@ -169,6 +171,26 @@ export default function TeamDetailPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked, vaultKey, teamId]);
+
+  // Al volver a esta pestaña se refresca el vault del equipo sin recargar
+  // — útil de verdad en equipo: si otro miembro añade algo, lo ves en
+  // cuanto vuelves a mirar, sin tener que darle a F5.
+  useEffect(() => {
+    if (!unlocked || !teamKey) return;
+    function refresh() {
+      if (document.visibilityState !== 'visible') return;
+      loadItems(teamKey!);
+      loadFolders(teamKey!);
+      loadMembers();
+    }
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked, teamKey]);
 
   const folderMap = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
   const breadcrumb = useMemo(() => {
@@ -515,32 +537,51 @@ export default function TeamDetailPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {visibleItems.map((item) => (
-              <li key={item.id} className="flex items-center justify-between rounded-2xl border border-line bg-surface/70 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-[14.5px] font-semibold text-foreground">{item.data.title || '(sin título)'}</p>
-                  <p className="truncate text-[12px] text-dim">{item.data.username}</p>
-                </div>
-                {canWrite && (
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      onClick={() => openEdit(item)}
-                      aria-label="Editar"
-                      className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-line"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteItem(item.id)}
-                      aria-label="Borrar"
-                      className="grid h-8 w-8 place-items-center rounded-lg text-danger hover:bg-danger/10"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+            {visibleItems.map((item) => {
+              const brand = matchBrandIcon(item.data.title);
+              const tone = brand?.hex ?? avatarTone(item.data.title || item.id);
+              return (
+                <li key={item.id} className="rounded-2xl border border-line bg-surface/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[13px] font-bold text-white"
+                        style={{ background: brand ? `${tone}26` : tone, color: brand ? tone : undefined }}
+                      >
+                        {brand ? (
+                          <BrandIcon slug={brand.slug} className="block h-4.5 w-4.5 [&_svg]:h-full [&_svg]:w-full" />
+                        ) : (
+                          (item.data.title || '?').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[14.5px] font-semibold text-foreground">{item.data.title || '(sin título)'}</p>
+                        <p className="truncate text-[12px] text-dim">{item.data.username}</p>
+                      </div>
+                    </div>
+                    {canWrite && (
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          onClick={() => openEdit(item)}
+                          aria-label="Editar"
+                          className="grid h-8 w-8 place-items-center rounded-lg text-dim hover:bg-line"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => onDeleteItem(item.id)}
+                          aria-label="Borrar"
+                          className="grid h-8 w-8 place-items-center rounded-lg text-danger hover:bg-danger/10"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </li>
-            ))}
+                  {item.data.totpSecret && <TotpCode secret={item.data.totpSecret} />}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -666,6 +707,12 @@ export default function TeamDetailPage() {
               placeholder="Contraseña"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className={`${inputClass} font-mono`}
+            />
+            <input
+              placeholder="Secreto 2FA / TOTP (opcional)"
+              value={form.totpSecret ?? ''}
+              onChange={(e) => setForm({ ...form, totpSecret: e.target.value.trim() })}
               className={`${inputClass} font-mono`}
             />
             {folders.length > 0 && (

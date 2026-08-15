@@ -31,6 +31,7 @@ import PasswordGenerator from '@/components/PasswordGenerator';
 import { AppShell } from '@/components/AppShell';
 import { BrandIcon } from '@/components/BrandIcon';
 import { FolderPicker } from '@/components/FolderPicker';
+import { TotpCode } from '@/components/TotpCode';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 interface VaultItemData {
@@ -39,6 +40,7 @@ interface VaultItemData {
   password: string;
   url: string;
   notes: string;
+  totpSecret?: string;
 }
 
 interface RawItem {
@@ -64,7 +66,7 @@ interface RawFolder {
 
 type DecryptedFolder = FolderNode;
 
-const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '' };
+const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '', totpSecret: '' };
 const AVATAR_TONES = ['#6c5ce7', '#8b7cf6', '#b8b3ff', '#34d399', '#fbbf24', '#fb7185'];
 
 function avatarTone(seed: string) {
@@ -105,58 +107,68 @@ export default function VaultPage() {
       .then((data) => router.replace(data.user ? '/unlock' : '/login'));
   }, [unlocked, router]);
 
-  useEffect(() => {
-    if (!unlocked || !vaultKey) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const res = await fetch('/api/vault/items');
-      if (!res.ok) {
-        setLoading(false);
-        return;
+  async function loadItems(key: Uint8Array, silent = false) {
+    if (!silent) setLoading(true);
+    const res = await fetch('/api/vault/items');
+    if (!res.ok) {
+      setLoading(false);
+      return;
+    }
+    const { items: raw } = (await res.json()) as { items: RawItem[] };
+    const decrypted: DecryptedItem[] = [];
+    for (const item of raw) {
+      try {
+        const blob = JSON.parse(item.encrypted_blob) as EncryptedBlob;
+        const data = await decryptJson<VaultItemData>(key, blob);
+        decrypted.push({ id: item.id, updatedAt: item.updated_at, folderId: item.folder_id, data });
+      } catch {
+        // item cifrado con otra key (no debería pasar) — se omite en vez de romper la lista
       }
-      const { items: raw } = (await res.json()) as { items: RawItem[] };
-      const decrypted: DecryptedItem[] = [];
-      for (const item of raw) {
-        try {
-          const blob = JSON.parse(item.encrypted_blob) as EncryptedBlob;
-          const data = await decryptJson<VaultItemData>(vaultKey, blob);
-          decrypted.push({ id: item.id, updatedAt: item.updated_at, folderId: item.folder_id, data });
-        } catch {
-          // item cifrado con otra key (no debería pasar) — se omite en vez de romper la lista
-        }
+    }
+    setItems(decrypted);
+    setLoading(false);
+  }
+
+  async function loadFolders(key: Uint8Array) {
+    const res = await fetch('/api/vault/folders');
+    if (!res.ok) return;
+    const { folders: raw } = (await res.json()) as { folders: RawFolder[] };
+    const decrypted: DecryptedFolder[] = [];
+    for (const folder of raw) {
+      try {
+        const blob = JSON.parse(folder.encrypted_name) as EncryptedBlob;
+        const { name } = await decryptJson<{ name: string }>(key, blob);
+        decrypted.push({ id: folder.id, name, parentId: folder.parent_id });
+      } catch {
+        // carpeta cifrada con otra key — se omite
       }
-      if (!cancelled) {
-        setItems(decrypted);
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [unlocked, vaultKey]);
+    }
+    setFolders(decrypted);
+  }
 
   useEffect(() => {
     if (!unlocked || !vaultKey) return;
-    let cancelled = false;
-    (async () => {
-      const res = await fetch('/api/vault/folders');
-      if (!res.ok) return;
-      const { folders: raw } = (await res.json()) as { folders: RawFolder[] };
-      const decrypted: DecryptedFolder[] = [];
-      for (const folder of raw) {
-        try {
-          const blob = JSON.parse(folder.encrypted_name) as EncryptedBlob;
-          const { name } = await decryptJson<{ name: string }>(vaultKey, blob);
-          decrypted.push({ id: folder.id, name, parentId: folder.parent_id });
-        } catch {
-          // carpeta cifrada con otra key — se omite
-        }
-      }
-      if (!cancelled) setFolders(decrypted);
-    })();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial estándar, no un loop de sincronización
+    loadItems(vaultKey);
+    loadFolders(vaultKey);
+  }, [unlocked, vaultKey]);
+
+  // "Dinámico de verdad": si añades/editas algo desde el móvil o desde
+  // otra pestaña, al volver a esta pestaña se refresca solo — sin recargar
+  // la página. Sin spinner (silent) para no interrumpir lo que se esté
+  // mirando.
+  useEffect(() => {
+    if (!unlocked || !vaultKey) return;
+    function refresh() {
+      if (document.visibilityState !== 'visible') return;
+      loadItems(vaultKey!, true);
+      loadFolders(vaultKey!);
+    }
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
     return () => {
-      cancelled = true;
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
     };
   }, [unlocked, vaultKey]);
 
@@ -643,47 +655,57 @@ export default function VaultPage() {
       )}
 
       <ul className="space-y-2.5">
-        {filtered.map((item) => (
-          <li key={item.id} className="rounded-2xl border border-line bg-surface/70 p-4">
-            <div className="flex items-center gap-3">
-              <div
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[15px] font-bold text-white"
-                style={{ background: avatarTone(item.data.title || item.id) }}
-              >
-                {(item.data.title || '?').charAt(0).toUpperCase()}
+        {filtered.map((item) => {
+          const brand = matchBrandIcon(item.data.title);
+          const tone = brand?.hex ?? avatarTone(item.data.title || item.id);
+          return (
+            <li key={item.id} className="rounded-2xl border border-line bg-surface/70 p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[15px] font-bold text-white"
+                  style={{ background: brand ? `${tone}26` : tone, color: brand ? tone : undefined }}
+                >
+                  {brand ? (
+                    <BrandIcon slug={brand.slug} className="block h-5 w-5 [&_svg]:h-full [&_svg]:w-full" />
+                  ) : (
+                    (item.data.title || '?').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold text-foreground">{item.data.title || '(sin título)'}</p>
+                  <p className="truncate text-[12.5px] text-dim">{item.data.username || item.data.url || '—'}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold text-foreground">{item.data.title || '(sin título)'}</p>
-                <p className="truncate text-[12.5px] text-dim">{item.data.username || item.data.url || '—'}</p>
-              </div>
-            </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
-              <span className="truncate font-mono text-[13px] text-mist">
-                {revealId === item.id ? item.data.password : '••••••••••••'}
-              </span>
-              <div className="flex shrink-0 items-center gap-1">
-                <IconBtn onClick={() => setRevealId(revealId === item.id ? null : item.id)} label={revealId === item.id ? 'Ocultar' : 'Ver'}>
-                  {revealId === item.id ? <EyeOff size={15} /> : <Eye size={15} />}
-                </IconBtn>
-                <IconBtn onClick={() => copy(item.data.password)} label="Copiar">
-                  <Copy size={15} />
-                </IconBtn>
-                <IconBtn onClick={() => openEdit(item)} label="Editar">
-                  <Pencil size={15} />
-                </IconBtn>
-                {writeableTeams.length > 0 && (
-                  <IconBtn onClick={() => setMovingItemId(item.id)} label="Copiar a equipo">
-                    <Users2 size={15} />
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
+                <span className="truncate font-mono text-[13px] text-mist">
+                  {revealId === item.id ? item.data.password : '••••••••••••'}
+                </span>
+                <div className="flex shrink-0 items-center gap-1">
+                  <IconBtn onClick={() => setRevealId(revealId === item.id ? null : item.id)} label={revealId === item.id ? 'Ocultar' : 'Ver'}>
+                    {revealId === item.id ? <EyeOff size={15} /> : <Eye size={15} />}
                   </IconBtn>
-                )}
-                <IconBtn onClick={() => onDelete(item.id)} label="Borrar" danger>
-                  <Trash2 size={15} />
-                </IconBtn>
+                  <IconBtn onClick={() => copy(item.data.password)} label="Copiar">
+                    <Copy size={15} />
+                  </IconBtn>
+                  <IconBtn onClick={() => openEdit(item)} label="Editar">
+                    <Pencil size={15} />
+                  </IconBtn>
+                  {writeableTeams.length > 0 && (
+                    <IconBtn onClick={() => setMovingItemId(item.id)} label="Copiar a equipo">
+                      <Users2 size={15} />
+                    </IconBtn>
+                  )}
+                  <IconBtn onClick={() => onDelete(item.id)} label="Borrar" danger>
+                    <Trash2 size={15} />
+                  </IconBtn>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
+
+              {item.data.totpSecret && <TotpCode secret={item.data.totpSecret} />}
+            </li>
+          );
+        })}
       </ul>
 
       <button
@@ -724,6 +746,13 @@ export default function VaultPage() {
             />
 
             <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
+
+            <input
+              placeholder="Secreto 2FA / TOTP (opcional)"
+              value={form.totpSecret ?? ''}
+              onChange={(e) => setForm({ ...form, totpSecret: e.target.value.trim() })}
+              className={`${inputClass} font-mono`}
+            />
 
             {folders.length > 0 && (
               <select
