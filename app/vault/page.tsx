@@ -2,7 +2,26 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Copy, Pencil, Trash2, Search, Plus, Lock, LogOut, Folder, FolderPlus, X } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Copy,
+  Pencil,
+  Trash2,
+  Search,
+  Plus,
+  Lock,
+  LogOut,
+  Folder,
+  FolderPlus,
+  FolderOpen,
+  X,
+  ChevronRight,
+  Home,
+  MoreHorizontal,
+  FolderInput,
+  Check,
+} from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { encryptPrivateKey, generateKeyPair } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
@@ -43,6 +62,24 @@ interface RawFolder {
 interface DecryptedFolder {
   id: string;
   name: string;
+  parentId: string | null;
+}
+
+// Recorre folders y devuelve el propio id + todos sus descendientes (para
+// no permitir mover/dejar huérfano un subárbol de carpetas hacia sí mismo).
+function collectDescendants(id: string, all: DecryptedFolder[]): Set<string> {
+  const result = new Set<string>([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const f of all) {
+      if (f.parentId && result.has(f.parentId) && !result.has(f.id)) {
+        result.add(f.id);
+        grew = true;
+      }
+    }
+  }
+  return result;
 }
 
 const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '' };
@@ -62,6 +99,10 @@ export default function VaultPage() {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [showFolderForm, setShowFolderForm] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [actionFolderId, setActionFolderId] = useState<string | null>(null);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -121,7 +162,7 @@ export default function VaultPage() {
         try {
           const blob = JSON.parse(folder.encrypted_name) as EncryptedBlob;
           const { name } = await decryptJson<{ name: string }>(vaultKey, blob);
-          decrypted.push({ id: folder.id, name });
+          decrypted.push({ id: folder.id, name, parentId: folder.parent_id });
         } catch {
           // carpeta cifrada con otra key — se omite
         }
@@ -152,18 +193,46 @@ export default function VaultPage() {
     })();
   }, [unlocked, vaultKey]);
 
+  const searching = query.trim().length > 0;
+
+  // Con búsqueda activa se ignora la carpeta actual y se busca en todo el
+  // vault; sin búsqueda, la vista está "encarpetada": solo se ven los items
+  // que viven exactamente en la carpeta que se está navegando (null = raíz).
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    return items.filter((i) => {
-      if (activeFolderId !== null && i.folderId !== activeFolderId) return false;
-      if (!q) return true;
-      return (
-        i.data.title.toLowerCase().includes(q) ||
-        i.data.username.toLowerCase().includes(q) ||
-        i.data.url.toLowerCase().includes(q)
+    if (q) {
+      return items.filter(
+        (i) =>
+          i.data.title.toLowerCase().includes(q) ||
+          i.data.username.toLowerCase().includes(q) ||
+          i.data.url.toLowerCase().includes(q),
       );
-    });
+    }
+    return items.filter((i) => i.folderId === activeFolderId);
   }, [items, query, activeFolderId]);
+
+  const folderMap = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);
+
+  const breadcrumb = useMemo(() => {
+    const path: DecryptedFolder[] = [];
+    let cur = activeFolderId ? folderMap.get(activeFolderId) : undefined;
+    while (cur) {
+      path.unshift(cur);
+      cur = cur.parentId ? folderMap.get(cur.parentId) : undefined;
+    }
+    return path;
+  }, [activeFolderId, folderMap]);
+
+  const childFolders = useMemo(
+    () => folders.filter((f) => f.parentId === activeFolderId),
+    [folders, activeFolderId],
+  );
+
+  function folderStats(id: string) {
+    const subfolders = folders.filter((f) => f.parentId === id).length;
+    const directItems = items.filter((i) => i.folderId === id).length;
+    return { subfolders, directItems };
+  }
 
   function openCreate() {
     setEditingId(null);
@@ -188,24 +257,71 @@ export default function VaultPage() {
     const res = await fetch('/api/vault/folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ encryptedName }),
+      body: JSON.stringify({ encryptedName, parentId: activeFolderId }),
     });
     const data = await res.json();
     if (res.ok) {
-      setFolders((prev) => [...prev, { id: data.folder.id, name: newFolderName.trim() }]);
+      setFolders((prev) => [...prev, { id: data.folder.id, name: newFolderName.trim(), parentId: activeFolderId }]);
       setNewFolderName('');
       setShowFolderForm(false);
     }
   }
 
   async function onDeleteFolder(id: string) {
-    if (!confirm('¿Borrar esta carpeta? Los items dentro pasarán a "Todas".')) return;
+    const removed = collectDescendants(id, folders);
+    const label = folderMap.get(id)?.name ?? 'esta carpeta';
+    const msg =
+      removed.size > 1
+        ? `¿Borrar "${label}" y sus ${removed.size - 1} subcarpeta(s)? Los items dentro pasarán a la raíz.`
+        : `¿Borrar "${label}"? Los items dentro pasarán a la raíz.`;
+    if (!confirm(msg)) return;
+
+    const parentOfDeleted = folderMap.get(id)?.parentId ?? null;
     const res = await fetch(`/api/vault/folders/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      setFolders((prev) => prev.filter((f) => f.id !== id));
-      setItems((prev) => prev.map((i) => (i.folderId === id ? { ...i, folderId: null } : i)));
-      if (activeFolderId === id) setActiveFolderId(null);
+      setFolders((prev) => prev.filter((f) => !removed.has(f.id)));
+      setItems((prev) => prev.map((i) => (i.folderId && removed.has(i.folderId) ? { ...i, folderId: null } : i)));
+      if (activeFolderId && removed.has(activeFolderId)) setActiveFolderId(parentOfDeleted);
     }
+    setActionFolderId(null);
+  }
+
+  function startRenameFolder(id: string) {
+    setRenameDraft(folderMap.get(id)?.name ?? '');
+    setRenamingFolderId(id);
+    setActionFolderId(null);
+  }
+
+  async function onRenameFolder(id: string) {
+    if (!vaultKey || !renameDraft.trim()) {
+      setRenamingFolderId(null);
+      return;
+    }
+    const encryptedName = await encryptJson(vaultKey, { name: renameDraft.trim() });
+    const res = await fetch(`/api/vault/folders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encryptedName }),
+    });
+    if (res.ok) {
+      setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: renameDraft.trim() } : f)));
+    }
+    setRenamingFolderId(null);
+  }
+
+  async function onMoveFolder(id: string, newParentId: string | null) {
+    const res = await fetch(`/api/vault/folders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parentId: newParentId }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, parentId: newParentId } : f)));
+    } else {
+      alert(data.error || 'No se pudo mover la carpeta');
+    }
+    setMovingFolderId(null);
   }
 
   async function onSave(e: React.FormEvent) {
@@ -306,57 +422,117 @@ export default function VaultPage() {
         />
       </div>
 
-      <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1">
-        <FolderChip label="Todas" active={activeFolderId === null} onClick={() => setActiveFolderId(null)} />
-        {folders.map((f) => (
-          <FolderChip
-            key={f.id}
-            label={f.name}
-            active={activeFolderId === f.id}
-            onClick={() => setActiveFolderId(f.id)}
-            onDelete={() => onDeleteFolder(f.id)}
-          />
-        ))}
-        <button
-          onClick={() => setShowFolderForm(true)}
-          aria-label="Nueva carpeta"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-dim active:scale-90"
-        >
-          <FolderPlus size={15} />
-        </button>
-      </div>
+      {!searching && (
+        <>
+          {/* breadcrumb: Vault > carpeta > subcarpeta… */}
+          <div className="mb-3 flex items-center gap-1 overflow-x-auto text-[12.5px]">
+            <button
+              onClick={() => setActiveFolderId(null)}
+              className={`flex shrink-0 items-center gap-1 rounded-lg px-1.5 py-1 font-medium ${
+                activeFolderId === null ? 'text-foreground' : 'text-dim'
+              }`}
+            >
+              <Home size={13} /> Vault
+            </button>
+            {breadcrumb.map((f) => (
+              <span key={f.id} className="flex shrink-0 items-center gap-1">
+                <ChevronRight size={12} className="text-dim" />
+                <button
+                  onClick={() => setActiveFolderId(f.id)}
+                  className={`rounded-lg px-1.5 py-1 font-medium ${
+                    activeFolderId === f.id ? 'text-foreground' : 'text-dim'
+                  }`}
+                >
+                  {f.name}
+                </button>
+              </span>
+            ))}
+          </div>
 
-      {showFolderForm && (
-        <form onSubmit={onCreateFolder} className="mb-5 flex items-center gap-2">
-          <input
-            autoFocus
-            placeholder="Nombre de la carpeta"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            className={`${inputClass} flex-1`}
-          />
-          <button type="submit" className="rounded-xl bg-purple px-4 py-2.5 text-[13px] font-semibold text-white">
-            Crear
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowFolderForm(false);
-              setNewFolderName('');
-            }}
-            aria-label="Cancelar"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-dim"
-          >
-            <X size={16} />
-          </button>
-        </form>
+          {/* grid de carpetas: tarjetas de color, tocar para entrar */}
+          {(childFolders.length > 0 || true) && (
+            <div className="mb-5 grid grid-cols-3 gap-2.5">
+              {childFolders.map((f) => {
+                const tone = avatarTone(f.id);
+                const stats = folderStats(f.id);
+                return (
+                  <div
+                    key={f.id}
+                    className="group relative flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-surface/70 px-2 py-3.5 active:scale-95"
+                  >
+                    <button
+                      onClick={() => setActionFolderId(f.id)}
+                      aria-label="Opciones de carpeta"
+                      className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full text-dim"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                    <button onClick={() => setActiveFolderId(f.id)} className="flex flex-col items-center gap-1.5">
+                      <div
+                        className="grid h-11 w-11 place-items-center rounded-2xl"
+                        style={{ background: `${tone}26`, color: tone }}
+                      >
+                        <FolderOpen size={20} />
+                      </div>
+                      <span className="max-w-full truncate text-[12.5px] font-semibold text-foreground">{f.name}</span>
+                      <span className="text-[10.5px] text-dim">
+                        {stats.subfolders > 0 ? `${stats.subfolders} carpeta(s) · ` : ''}
+                        {stats.directItems} item(s)
+                      </span>
+                    </button>
+                  </div>
+                );
+              })}
+
+              <button
+                onClick={() => setShowFolderForm(true)}
+                className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line-strong px-2 py-3.5 text-dim active:scale-95"
+              >
+                <div className="grid h-11 w-11 place-items-center rounded-2xl border border-dashed border-line-strong">
+                  <FolderPlus size={18} />
+                </div>
+                <span className="text-[12px] font-medium">Nueva carpeta</span>
+              </button>
+            </div>
+          )}
+
+          {showFolderForm && (
+            <form onSubmit={onCreateFolder} className="mb-5 flex items-center gap-2">
+              <input
+                autoFocus
+                placeholder={activeFolderId ? `Carpeta dentro de "${folderMap.get(activeFolderId)?.name}"` : 'Nombre de la carpeta'}
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                className={`${inputClass} flex-1`}
+              />
+              <button type="submit" className="rounded-xl bg-purple px-4 py-2.5 text-[13px] font-semibold text-white">
+                Crear
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFolderForm(false);
+                  setNewFolderName('');
+                }}
+                aria-label="Cancelar"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-dim"
+              >
+                <X size={16} />
+              </button>
+            </form>
+          )}
+        </>
       )}
 
       {loading && <p className="text-[13px] text-dim">Descifrando vault…</p>}
-      {!loading && filtered.length === 0 && (
+      {!loading && filtered.length === 0 && childFolders.length === 0 && (
         <div className="rounded-2xl border border-dashed border-line-strong px-5 py-10 text-center">
           <p className="text-[13px] text-dim">
-            {items.length === 0 ? 'Tu vault está vacío. Crea tu primer item.' : 'Sin resultados.'}
+            {searching
+              ? 'Sin resultados.'
+              : activeFolderId
+                ? 'Esta carpeta está vacía.'
+                : 'Tu vault está vacío. Crea tu primer item o carpeta.'}
           </p>
         </div>
       )}
@@ -485,43 +661,159 @@ export default function VaultPage() {
           </form>
         </div>
       )}
+
+      {/* hoja de acciones: renombrar / mover / eliminar carpeta */}
+      {actionFolderId && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          onClick={() => setActionFolderId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="safe-bottom w-full max-w-md space-y-1.5 rounded-t-[28px] border border-line bg-surface p-4 sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">
+              {folderMap.get(actionFolderId)?.name}
+            </p>
+            <button
+              onClick={() => startRenameFolder(actionFolderId)}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[14px] font-medium text-foreground active:bg-surface-2"
+            >
+              <Pencil size={16} /> Renombrar
+            </button>
+            <button
+              onClick={() => {
+                setMovingFolderId(actionFolderId);
+                setActionFolderId(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[14px] font-medium text-foreground active:bg-surface-2"
+            >
+              <FolderInput size={16} /> Mover a…
+            </button>
+            <button
+              onClick={() => onDeleteFolder(actionFolderId)}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[14px] font-medium text-danger active:bg-danger/10"
+            >
+              <Trash2 size={16} /> Eliminar
+            </button>
+            <button
+              onClick={() => setActionFolderId(null)}
+              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* renombrar carpeta */}
+      {renamingFolderId && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onRenameFolder(renamingFolderId);
+            }}
+            className="safe-bottom w-full max-w-md space-y-3 rounded-t-[28px] border border-line bg-surface p-6 sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+            <h2 className="text-[17px] font-bold text-foreground">Renombrar carpeta</h2>
+            <input autoFocus value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} className={inputClass} />
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setRenamingFolderId(null)}
+                className="flex-1 rounded-2xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
+              >
+                Cancelar
+              </button>
+              <button type="submit" className={`${primaryButtonClass} flex-1`}>
+                Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* mover carpeta: lista plana con indentación por profundidad */}
+      {movingFolderId && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          onClick={() => setMovingFolderId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="safe-bottom max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-t-[28px] border border-line bg-surface p-4 sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">Mover a…</p>
+            <FolderPicker
+              folders={folders}
+              excludeIds={collectDescendants(movingFolderId, folders)}
+              currentParentId={folderMap.get(movingFolderId)?.parentId ?? null}
+              onPick={(newParentId) => onMoveFolder(movingFolderId, newParentId)}
+            />
+            <button
+              onClick={() => setMovingFolderId(null)}
+              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
 
-function FolderChip({
-  label,
-  active,
-  onClick,
-  onDelete,
+// Lista plana e indentada de todas las carpetas (excluyendo la que se está
+// moviendo y sus descendientes, para no crear un ciclo), con "Raíz" arriba.
+function FolderPicker({
+  folders,
+  excludeIds,
+  currentParentId,
+  onPick,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  onDelete?: () => void;
+  folders: DecryptedFolder[];
+  excludeIds: Set<string>;
+  currentParentId: string | null;
+  onPick: (id: string | null) => void;
 }) {
+  function depthOf(id: string): number {
+    let depth = 0;
+    let cur = folders.find((f) => f.id === id);
+    while (cur?.parentId) {
+      depth++;
+      cur = folders.find((f) => f.id === cur!.parentId);
+    }
+    return depth;
+  }
+
+  const options = folders.filter((f) => !excludeIds.has(f.id));
+
   return (
-    <div
-      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-        active ? 'border-purple bg-purple/15 text-purple' : 'border-line text-dim'
-      }`}
-    >
-      <button onClick={onClick} className="flex items-center gap-1.5">
-        <Folder size={13} />
-        {label}
+    <div className="space-y-0.5">
+      <button
+        onClick={() => onPick(null)}
+        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium active:bg-surface-2 ${
+          currentParentId === null ? 'text-purple' : 'text-foreground'
+        }`}
+      >
+        <Home size={15} /> Raíz {currentParentId === null && <Check size={14} className="ml-auto" />}
       </button>
-      {onDelete && (
+      {options.map((f) => (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          aria-label={`Borrar carpeta ${label}`}
-          className="opacity-60 hover:opacity-100"
+          key={f.id}
+          onClick={() => onPick(f.id)}
+          style={{ paddingLeft: `${12 + depthOf(f.id) * 18}px` }}
+          className={`flex w-full items-center gap-2 rounded-xl py-2.5 pr-3 text-left text-[14px] font-medium active:bg-surface-2 ${
+            currentParentId === f.id ? 'text-purple' : 'text-foreground'
+          }`}
         >
-          <X size={12} />
+          <Folder size={15} /> {f.name} {currentParentId === f.id && <Check size={14} className="ml-auto" />}
         </button>
-      )}
+      ))}
     </div>
   );
 }
