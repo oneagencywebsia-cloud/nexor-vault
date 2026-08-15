@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Lock, Share2, ShieldCheck, Users2, Settings2 } from 'lucide-react';
 import { NexorMark } from './NexorLogo';
@@ -36,6 +36,7 @@ const BLOB_DIAMETER = 44;
 
 export function BottomTabBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [blob, setBlob] = useState<{ left: number; width: number; radius: number; visible: boolean }>({
@@ -45,7 +46,9 @@ export function BottomTabBar() {
     visible: false,
   });
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [landed, setLanded] = useState(false);
   const [poppedHref, setPoppedHref] = useState<string | null>(null);
+  const hoveredRef = useRef<number | null>(null);
 
   const activeIndex = Math.max(
     0,
@@ -70,18 +73,26 @@ export function BottomTabBar() {
       const right = r.right - containerRect.left;
       if (relX >= left && relX <= right) {
         setBlob({ left, width: right - left, radius: 19, visible: true });
-        setHoveredIndex(i);
+        if (hoveredRef.current !== i) {
+          hoveredRef.current = i;
+          setHoveredIndex(i);
+          setLanded(true);
+          window.setTimeout(() => setLanded(false), 320);
+        }
         return;
       }
     }
 
+    hoveredRef.current = null;
     setHoveredIndex(null);
     const clamped = Math.min(Math.max(relX, BLOB_DIAMETER / 2), containerRect.width - BLOB_DIAMETER / 2);
     setBlob({ left: clamped - BLOB_DIAMETER / 2, width: BLOB_DIAMETER, radius: BLOB_DIAMETER / 2, visible: true });
   }
 
-  function endTouch() {
+  function endTouch(navigate: boolean) {
+    if (navigate && hoveredRef.current !== null) router.push(TABS[hoveredRef.current].href);
     setBlob((b) => ({ ...b, visible: false }));
+    hoveredRef.current = null;
     setHoveredIndex(null);
   }
 
@@ -95,9 +106,9 @@ export function BottomTabBar() {
       {/* filtro de refracción reutilizado por todos los iconos — solo se
           "activa" visualmente cuando la gota está encima (ver más abajo) */}
       <svg width="0" height="0" className="absolute" aria-hidden="true">
-        <filter id="nexor-glass-distortion">
-          <feTurbulence type="fractalNoise" baseFrequency="0.015 0.09" numOctaves="2" seed="7" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G" />
+        <filter id="nexor-glass-distortion" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.01 0.12" numOctaves="2" seed="7" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
 
@@ -107,15 +118,15 @@ export function BottomTabBar() {
         onPointerMove={(e) => {
           if (e.buttons > 0 || e.pointerType === 'touch') moveBlob(e.clientX);
         }}
-        onPointerUp={endTouch}
-        onPointerCancel={endTouch}
-        onPointerLeave={endTouch}
+        onPointerUp={() => endTouch(true)}
+        onPointerCancel={() => endTouch(false)}
+        onPointerLeave={() => endTouch(false)}
         style={{ touchAction: 'none' }}
         className="nexor-liquid-glass relative mx-auto flex w-full max-w-md items-stretch justify-between overflow-hidden rounded-[26px] px-1.5 py-1.5"
       >
         {/* gota de vidrio que sigue al dedo y se funde con cada pestaña */}
         <div
-          className="nexor-touch-blob pointer-events-none absolute top-1.5 bottom-1.5"
+          className={`nexor-touch-blob pointer-events-none absolute top-1.5 bottom-1.5 ${landed ? 'nexor-blob-land' : ''}`}
           style={{
             left: blob.left,
             width: blob.width,
@@ -152,15 +163,17 @@ export function BottomTabBar() {
                 <Icon
                   size={22}
                   strokeWidth={active ? 2.4 : 1.8}
-                  className={`transition-colors ${active ? 'text-purple' : 'text-dim'}`}
+                  className={`transition-opacity duration-200 ${active ? 'text-purple' : 'text-dim'} ${
+                    distorted ? 'opacity-0' : 'opacity-100'
+                  }`}
                 />
                 {/* copia distorsionada, se funde con la de arriba solo
                     mientras la gota de vidrio pasa por este icono */}
                 <Icon
                   size={22}
                   strokeWidth={active ? 2.4 : 1.8}
-                  className={`absolute inset-0 text-white transition-opacity duration-150 ${
-                    distorted ? 'opacity-70' : 'opacity-0'
+                  className={`absolute inset-0 transition-opacity duration-200 ${active ? 'text-purple' : 'text-dim'} ${
+                    distorted ? 'opacity-100' : 'opacity-0'
                   }`}
                   style={{ filter: 'url(#nexor-glass-distortion)' }}
                 />
