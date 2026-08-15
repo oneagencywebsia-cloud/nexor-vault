@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTeamMembership } from '@/lib/team-auth';
+import { sendPushToUser } from '@/lib/push';
 
 // El caller ya hizo el trabajo criptográfico en el cliente: desenvolvió su
 // propia copia de la team key y la re-envolvió con la clave pública del
@@ -44,5 +45,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .insert({ team_id: teamId, invited_user_id: invitee.id, role: inviteRole, wrapped_team_key: wrappedTeamKey });
 
   if (error) return NextResponse.json({ error: 'No se pudo invitar' }, { status: 500 });
+
+  const { data: team } = await supabaseAdmin.from('teams').select('name').eq('id', teamId).maybeSingle();
+  sendPushToUser(invitee.id, {
+    title: 'Nueva invitación de equipo',
+    body: `Te han invitado a "${team?.name ?? 'un equipo'}" en Nexor Vault.`,
+    url: '/teams',
+  }).catch(() => {});
+
   return NextResponse.json({ ok: true });
 }

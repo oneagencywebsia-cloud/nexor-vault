@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Lock, Share2, ShieldCheck, Users2, Settings2 } from 'lucide-react';
 import { NexorMark } from './NexorLogo';
+import PushSetup from './PushSetup';
 
 const TABS = [
   { href: '/vault', label: 'Vault', icon: Lock },
@@ -70,6 +71,7 @@ export function AppShell({
 }) {
   return (
     <div className="nexor-mesh-bg flex min-h-screen flex-col bg-void">
+      <PushSetup />
       <TopBar title={title} subtitle={subtitle} right={right} />
       <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-28 pt-5">{children}</main>
       <BottomTabBar />

@@ -34,6 +34,8 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true);
 
   const [newTeamName, setNewTeamName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +82,28 @@ export default function TeamsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo crear el equipo');
+
+      const email = inviteEmail.toLowerCase().trim();
+      if (email) {
+        try {
+          const lookupRes = await fetch(`/api/share/lookup?email=${encodeURIComponent(email)}`);
+          const lookupData = await lookupRes.json();
+          if (!lookupRes.ok) throw new Error(lookupData.error || 'No se pudo encontrar a ese usuario');
+          const wrappedForInvitee = await wrapRawKey(lookupData.publicKey, teamKeyRaw);
+          const inviteRes = await fetch(`/api/teams/${data.team.id}/invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, role: inviteRole, wrappedTeamKey: wrappedForInvitee }),
+          });
+          const inviteData = await inviteRes.json();
+          if (!inviteRes.ok) throw new Error(inviteData.error || 'Equipo creado, pero no se pudo invitar');
+        } catch (inviteErr) {
+          setError(inviteErr instanceof Error ? inviteErr.message : 'Equipo creado, pero la invitación falló');
+        }
+      }
+
       setNewTeamName('');
+      setInviteEmail('');
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado');
@@ -181,6 +204,23 @@ export default function TeamsPage() {
             onChange={(e) => setNewTeamName(e.target.value)}
             className={inputClass}
           />
+          <input
+            type="email"
+            placeholder="Email a invitar (opcional)"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            className={inputClass}
+          />
+          {inviteEmail && (
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as 'editor' | 'viewer')}
+              className={inputClass}
+            >
+              <option value="editor">Editor (puede añadir/editar items)</option>
+              <option value="viewer">Viewer (solo lectura)</option>
+            </select>
+          )}
           {error && <p className="text-[13px] text-danger">{error}</p>}
           <button type="submit" disabled={creating} className={`${primaryButtonClass} flex items-center justify-center gap-2`}>
             <Plus size={16} /> {creating ? 'Creando…' : 'Crear equipo'}

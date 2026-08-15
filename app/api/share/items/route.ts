@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendPushToUser } from '@/lib/push';
 
 // Lista lo recibido (pendiente de aceptar/rechazar) y lo enviado (para que
 // el remitente vea qué está pendiente del lado del receptor).
@@ -59,5 +60,12 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error || !data) return NextResponse.json({ error: 'No se pudo compartir el item' }, { status: 500 });
+
+  sendPushToUser(recipient.id, {
+    title: 'Te han compartido un item',
+    body: 'Alguien ha compartido contigo una contraseña en Nexor Vault.',
+    url: '/share',
+  }).catch(() => {});
+
   return NextResponse.json({ ok: true, id: data.id });
 }

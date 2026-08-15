@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Copy, Pencil, Trash2, Search, Plus, Lock, LogOut } from 'lucide-react';
+import { Eye, EyeOff, Copy, Pencil, Trash2, Search, Plus, Lock, LogOut, Folder, FolderPlus, X } from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { encryptPrivateKey, generateKeyPair } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
@@ -30,7 +30,19 @@ interface RawItem {
 interface DecryptedItem {
   id: string;
   updatedAt: string;
+  folderId: string | null;
   data: VaultItemData;
+}
+
+interface RawFolder {
+  id: string;
+  encrypted_name: string;
+  parent_id: string | null;
+}
+
+interface DecryptedFolder {
+  id: string;
+  name: string;
 }
 
 const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '' };
@@ -46,10 +58,15 @@ export default function VaultPage() {
   const router = useRouter();
   const { email, vaultKey, unlocked, lock } = useVaultStore();
   const [items, setItems] = useState<DecryptedItem[]>([]);
+  const [folders, setFolders] = useState<DecryptedFolder[]>([]);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [showFolderForm, setShowFolderForm] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<VaultItemData>(EMPTY_FORM);
+  const [formFolderId, setFormFolderId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [revealId, setRevealId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +94,7 @@ export default function VaultPage() {
         try {
           const blob = JSON.parse(item.encrypted_blob) as EncryptedBlob;
           const data = await decryptJson<VaultItemData>(vaultKey, blob);
-          decrypted.push({ id: item.id, updatedAt: item.updated_at, data });
+          decrypted.push({ id: item.id, updatedAt: item.updated_at, folderId: item.folder_id, data });
         } catch {
           // item cifrado con otra key (no debería pasar) — se omite en vez de romper la lista
         }
@@ -86,6 +103,30 @@ export default function VaultPage() {
         setItems(decrypted);
         setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [unlocked, vaultKey]);
+
+  useEffect(() => {
+    if (!unlocked || !vaultKey) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch('/api/vault/folders');
+      if (!res.ok) return;
+      const { folders: raw } = (await res.json()) as { folders: RawFolder[] };
+      const decrypted: DecryptedFolder[] = [];
+      for (const folder of raw) {
+        try {
+          const blob = JSON.parse(folder.encrypted_name) as EncryptedBlob;
+          const { name } = await decryptJson<{ name: string }>(vaultKey, blob);
+          decrypted.push({ id: folder.id, name });
+        } catch {
+          // carpeta cifrada con otra key — se omite
+        }
+      }
+      if (!cancelled) setFolders(decrypted);
     })();
     return () => {
       cancelled = true;
@@ -113,18 +154,21 @@ export default function VaultPage() {
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return items;
-    return items.filter(
-      (i) =>
+    return items.filter((i) => {
+      if (activeFolderId !== null && i.folderId !== activeFolderId) return false;
+      if (!q) return true;
+      return (
         i.data.title.toLowerCase().includes(q) ||
         i.data.username.toLowerCase().includes(q) ||
-        i.data.url.toLowerCase().includes(q),
-    );
-  }, [items, query]);
+        i.data.url.toLowerCase().includes(q)
+      );
+    });
+  }, [items, query, activeFolderId]);
 
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setFormFolderId(activeFolderId);
     setError(null);
     setShowForm(true);
   }
@@ -132,8 +176,36 @@ export default function VaultPage() {
   function openEdit(item: DecryptedItem) {
     setEditingId(item.id);
     setForm(item.data);
+    setFormFolderId(item.folderId);
     setError(null);
     setShowForm(true);
+  }
+
+  async function onCreateFolder(e: React.FormEvent) {
+    e.preventDefault();
+    if (!vaultKey || !newFolderName.trim()) return;
+    const encryptedName = await encryptJson(vaultKey, { name: newFolderName.trim() });
+    const res = await fetch('/api/vault/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encryptedName }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setFolders((prev) => [...prev, { id: data.folder.id, name: newFolderName.trim() }]);
+      setNewFolderName('');
+      setShowFolderForm(false);
+    }
+  }
+
+  async function onDeleteFolder(id: string) {
+    if (!confirm('¿Borrar esta carpeta? Los items dentro pasarán a "Todas".')) return;
+    const res = await fetch(`/api/vault/folders/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      setItems((prev) => prev.map((i) => (i.folderId === id ? { ...i, folderId: null } : i)));
+      if (activeFolderId === id) setActiveFolderId(null);
+    }
   }
 
   async function onSave(e: React.FormEvent) {
@@ -146,22 +218,29 @@ export default function VaultPage() {
         const res = await fetch(`/api/vault/items/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ encryptedBlob }),
+          body: JSON.stringify({ encryptedBlob, folderId: formFolderId }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         setItems((prev) =>
-          prev.map((i) => (i.id === editingId ? { id: editingId, updatedAt: data.item.updated_at, data: form } : i)),
+          prev.map((i) =>
+            i.id === editingId
+              ? { id: editingId, updatedAt: data.item.updated_at, folderId: formFolderId, data: form }
+              : i,
+          ),
         );
       } else {
         const res = await fetch('/api/vault/items', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemType: 'login', encryptedBlob }),
+          body: JSON.stringify({ itemType: 'login', encryptedBlob, folderId: formFolderId }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        setItems((prev) => [{ id: data.item.id, updatedAt: data.item.updated_at, data: form }, ...prev]);
+        setItems((prev) => [
+          { id: data.item.id, updatedAt: data.item.updated_at, folderId: formFolderId, data: form },
+          ...prev,
+        ]);
       }
       setShowForm(false);
     } catch (err) {
@@ -226,6 +305,52 @@ export default function VaultPage() {
           className={`${inputClass} pl-11`}
         />
       </div>
+
+      <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-1">
+        <FolderChip label="Todas" active={activeFolderId === null} onClick={() => setActiveFolderId(null)} />
+        {folders.map((f) => (
+          <FolderChip
+            key={f.id}
+            label={f.name}
+            active={activeFolderId === f.id}
+            onClick={() => setActiveFolderId(f.id)}
+            onDelete={() => onDeleteFolder(f.id)}
+          />
+        ))}
+        <button
+          onClick={() => setShowFolderForm(true)}
+          aria-label="Nueva carpeta"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-dim active:scale-90"
+        >
+          <FolderPlus size={15} />
+        </button>
+      </div>
+
+      {showFolderForm && (
+        <form onSubmit={onCreateFolder} className="mb-5 flex items-center gap-2">
+          <input
+            autoFocus
+            placeholder="Nombre de la carpeta"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            className={`${inputClass} flex-1`}
+          />
+          <button type="submit" className="rounded-xl bg-purple px-4 py-2.5 text-[13px] font-semibold text-white">
+            Crear
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowFolderForm(false);
+              setNewFolderName('');
+            }}
+            aria-label="Cancelar"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-dim"
+          >
+            <X size={16} />
+          </button>
+        </form>
+      )}
 
       {loading && <p className="text-[13px] text-dim">Descifrando vault…</p>}
       {!loading && filtered.length === 0 && (
@@ -314,6 +439,21 @@ export default function VaultPage() {
 
             <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
 
+            {folders.length > 0 && (
+              <select
+                value={formFolderId ?? ''}
+                onChange={(e) => setFormFolderId(e.target.value || null)}
+                className={inputClass}
+              >
+                <option value="">Sin carpeta</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <input
               placeholder="URL"
               value={form.url}
@@ -346,6 +486,43 @@ export default function VaultPage() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+function FolderChip({
+  label,
+  active,
+  onClick,
+  onDelete,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+        active ? 'border-purple bg-purple/15 text-purple' : 'border-line text-dim'
+      }`}
+    >
+      <button onClick={onClick} className="flex items-center gap-1.5">
+        <Folder size={13} />
+        {label}
+      </button>
+      {onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label={`Borrar carpeta ${label}`}
+          className="opacity-60 hover:opacity-100"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </div>
   );
 }
 
