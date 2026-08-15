@@ -96,9 +96,32 @@ export function BottomTabBar() {
     setHoveredIndex(null);
   }
 
-  function pop(href: string) {
+  // Tap simple (sin arrastre): la burbuja también viaja hasta esa pestaña
+  // y aterriza ahí un instante, para que el toque siempre tenga el mismo
+  // feedback visual que arrastrar el dedo hasta esa opción.
+  function pop(href: string, i: number) {
     setPoppedHref(href);
     window.setTimeout(() => setPoppedHref((cur) => (cur === href ? null : cur)), 420);
+
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    const el = tabRefs.current[i];
+    if (!containerRect || !el) return;
+    const r = el.getBoundingClientRect();
+    const left = r.left - containerRect.left;
+    const right = r.right - containerRect.left;
+
+    hoveredRef.current = i;
+    setHoveredIndex(i);
+    setBlob({ left, width: right - left, radius: 19, visible: true });
+    setLanded(true);
+    window.setTimeout(() => setLanded(false), 320);
+    window.setTimeout(() => {
+      setBlob((b) => ({ ...b, visible: false }));
+      if (hoveredRef.current === i) {
+        hoveredRef.current = null;
+        setHoveredIndex(null);
+      }
+    }, 420);
   }
 
   return (
@@ -154,7 +177,7 @@ export function BottomTabBar() {
               ref={(el) => {
                 tabRefs.current[i] = el;
               }}
-              onClick={() => pop(href)}
+              onClick={() => pop(href, i)}
               className={`relative z-10 flex flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-1.5 transition-transform active:scale-90 ${
                 poppedHref === href ? 'nexor-tab-pop' : ''
               }`}
