@@ -52,3 +52,25 @@ export async function generateTotpCode(secretBase32: string, atTimeMs = Date.now
     secondsRemaining: PERIOD_SECONDS - (Math.floor(atTimeMs / 1000) % PERIOD_SECONDS),
   };
 }
+
+// Acepta lo que el usuario tenga a mano: el secreto base32 pelado (lo que
+// se pega a mano hoy), o un link completo `otpauth://totp/...?secret=...`
+// (lo que sale de escanear un QR, o de "no puedes escanear? copia este
+// link" en la mayoría de webs) — le quita la complejidad de tener que
+// localizar y copiar solo el trozo del secreto.
+export function extractTotpSecret(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.toLowerCase().startsWith('otpauth://')) {
+    try {
+      const url = new URL(trimmed);
+      const secret = url.searchParams.get('secret');
+      return secret ? secret.toUpperCase() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return trimmed.toUpperCase().replace(/\s+/g, '');
+}

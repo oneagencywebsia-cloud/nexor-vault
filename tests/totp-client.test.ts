@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateTotpCode } from '@/lib/totp-client';
+import { extractTotpSecret, generateTotpCode } from '@/lib/totp-client';
 
 describe('generateTotpCode', () => {
   it('produce un código de 6 dígitos', async () => {
@@ -34,5 +34,25 @@ describe('generateTotpCode', () => {
     const { secondsRemaining } = await generateTotpCode('JBSWY3DPEHPK3PXP');
     expect(secondsRemaining).toBeGreaterThan(0);
     expect(secondsRemaining).toBeLessThanOrEqual(30);
+  });
+});
+
+describe('extractTotpSecret', () => {
+  it('limpia espacios y pone en mayúsculas un secreto pegado a mano', () => {
+    expect(extractTotpSecret(' jbswy3dp ehpk3pxp ')).toBe('JBSWY3DPEHPK3PXP');
+  });
+
+  it('extrae el secreto de un link otpauth:// completo', () => {
+    const uri = 'otpauth://totp/Example:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example';
+    expect(extractTotpSecret(uri)).toBe('JBSWY3DPEHPK3PXP');
+  });
+
+  it('devuelve null si el otpauth:// no trae secret', () => {
+    expect(extractTotpSecret('otpauth://totp/Example:alice@example.com?issuer=Example')).toBeNull();
+  });
+
+  it('devuelve null para input vacío', () => {
+    expect(extractTotpSecret('')).toBeNull();
+    expect(extractTotpSecret('   ')).toBeNull();
   });
 });

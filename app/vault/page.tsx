@@ -32,6 +32,7 @@ import { AppShell } from '@/components/AppShell';
 import { BrandIcon } from '@/components/BrandIcon';
 import { FolderPicker } from '@/components/FolderPicker';
 import { TotpCode } from '@/components/TotpCode';
+import { TotpSecretInput } from '@/components/TotpSecretInput';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 interface VaultItemData {
@@ -747,12 +748,7 @@ export default function VaultPage() {
 
             <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
 
-            <input
-              placeholder="Secreto 2FA / TOTP (opcional)"
-              value={form.totpSecret ?? ''}
-              onChange={(e) => setForm({ ...form, totpSecret: e.target.value.trim() })}
-              className={`${inputClass} font-mono`}
-            />
+            <TotpSecretInput value={form.totpSecret ?? ''} onChange={(secret) => setForm((f) => ({ ...f, totpSecret: secret }))} />
 
             {folders.length > 0 && (
               <select
