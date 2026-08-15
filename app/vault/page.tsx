@@ -355,16 +355,13 @@ export default function VaultPage() {
     setMovingFolderId(null);
   }
 
-  // Mueve una carpeta ENTERA (y sus subcarpetas) a un equipo: re-cifra cada
-  // item del subárbol con la team key y lo crea allí; solo si todos se
-  // crean sin errores se borran del vault personal y se elimina la carpeta
-  // (el cascade de Postgres se lleva las subcarpetas). Si algo falla a
-  // medio camino, no se borra nada — puede quedar algún item duplicado en
-  // el equipo, pero nunca se pierde nada del vault personal.
+  // Copia (no mueve) una carpeta ENTERA (y sus subcarpetas) a un equipo:
+  // re-cifra cada item del subárbol con la team key y lo crea allí. La
+  // carpeta y sus items se quedan intactos en el vault personal.
   async function onMoveFolderToTeam(folderId: string, team: { id: string; wrappedTeamKey: string }) {
     if (!vaultKey) return;
     const subtree = collectDescendants(folderId, folders);
-    const itemsToMove = items.filter((i) => i.folderId && subtree.has(i.folderId));
+    const itemsToCopy = items.filter((i) => i.folderId && subtree.has(i.folderId));
 
     setMoveToTeamBusy(true);
     setMoveToTeamError(null);
@@ -374,7 +371,7 @@ export default function VaultPage() {
       if (!user?.encryptedPrivateKey) throw new Error('Aún no tienes claves de compartir configuradas');
       const teamKey = await unwrapRawKey(vaultKey, user.encryptedPrivateKey, team.wrappedTeamKey);
 
-      for (const item of itemsToMove) {
+      for (const item of itemsToCopy) {
         const encryptedBlob = await encryptJson(teamKey, item.data);
         const res = await fetch(`/api/teams/${team.id}/items`, {
           method: 'POST',
@@ -382,18 +379,9 @@ export default function VaultPage() {
           body: JSON.stringify({ itemType: 'login', encryptedBlob }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `No se pudo mover "${item.data.title || 'un item'}"`);
+        if (!res.ok) throw new Error(data.error || `No se pudo copiar "${item.data.title || 'un item'}"`);
       }
 
-      await Promise.all(itemsToMove.map((item) => fetch(`/api/vault/items/${item.id}`, { method: 'DELETE' })));
-      await fetch(`/api/vault/folders/${folderId}`, { method: 'DELETE' });
-
-      const movedIds = new Set(itemsToMove.map((i) => i.id));
-      setItems((prev) => prev.filter((i) => !movedIds.has(i.id)));
-      setFolders((prev) => prev.filter((f) => !subtree.has(f.id)));
-      if (activeFolderId && subtree.has(activeFolderId)) {
-        setActiveFolderId(folderMap.get(folderId)?.parentId ?? null);
-      }
       setMovingFolderId(null);
     } catch (err) {
       setMoveToTeamError(err instanceof Error ? err.message : 'Error inesperado');
@@ -452,6 +440,9 @@ export default function VaultPage() {
   // localmente con la team key (desenvuelta con la clave privada propia)
   // y solo entonces se crea allí y se borra del vault personal — el
   // server nunca ve el item en claro en ningún punto del proceso.
+  // Copia (no mueve) un item del vault personal al vault de un equipo: se
+  // re-cifra localmente con la team key y se crea allí; el original se
+  // queda intacto en el vault personal.
   async function onMoveToTeam(itemId: string, team: { id: string; wrappedTeamKey: string }) {
     if (!vaultKey) return;
     const item = items.find((i) => i.id === itemId);
@@ -472,10 +463,8 @@ export default function VaultPage() {
         body: JSON.stringify({ itemType: 'login', encryptedBlob }),
       });
       const createData = await createRes.json();
-      if (!createRes.ok) throw new Error(createData.error || 'No se pudo mover al equipo');
+      if (!createRes.ok) throw new Error(createData.error || 'No se pudo copiar al equipo');
 
-      await fetch(`/api/vault/items/${itemId}`, { method: 'DELETE' });
-      setItems((prev) => prev.filter((i) => i.id !== itemId));
       setMovingItemId(null);
     } catch (err) {
       setMoveToTeamError(err instanceof Error ? err.message : 'Error inesperado');
@@ -687,7 +676,7 @@ export default function VaultPage() {
                   <Pencil size={15} />
                 </IconBtn>
                 {writeableTeams.length > 0 && (
-                  <IconBtn onClick={() => setMovingItemId(item.id)} label="Mover a equipo">
+                  <IconBtn onClick={() => setMovingItemId(item.id)} label="Copiar a equipo">
                     <Users2 size={15} />
                   </IconBtn>
                 )}
@@ -883,10 +872,10 @@ export default function VaultPage() {
             {writeableTeams.length > 0 && (
               <>
                 <p className="mb-1 mt-3 px-2 text-[11.5px] font-semibold uppercase tracking-wide text-dim">
-                  O mover a un equipo
+                  O copiar a un equipo
                 </p>
                 <p className="mb-1 px-2 text-[11.5px] text-dim">
-                  Se mueven todos los items de esta carpeta (y subcarpetas) y la carpeta desaparece.
+                  Se copian todos los items de esta carpeta (y subcarpetas); en tu vault personal no cambia nada.
                 </p>
                 {writeableTeams.map((team) => (
                   <button
@@ -908,7 +897,7 @@ export default function VaultPage() {
               disabled={moveToTeamBusy}
               className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground disabled:opacity-50"
             >
-              {moveToTeamBusy ? 'Moviendo…' : 'Cancelar'}
+              {moveToTeamBusy ? 'Copiando…' : 'Cancelar'}
             </button>
           </div>
         </div>
@@ -925,9 +914,9 @@ export default function VaultPage() {
             className="safe-bottom max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-t-[28px] border border-line bg-surface p-4 sm:rounded-[28px]"
           >
             <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
-            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">Mover a equipo…</p>
+            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">Copiar a equipo…</p>
             <p className="mb-2 px-2 text-[12px] text-dim">
-              Se cifrará con la clave del equipo y desaparecerá de tu vault personal.
+              Se cifrará con la clave del equipo y se añadirá ahí; se queda igual en tu vault personal.
             </p>
             {writeableTeams.map((team) => (
               <button
@@ -945,7 +934,7 @@ export default function VaultPage() {
               disabled={moveToTeamBusy}
               className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground disabled:opacity-50"
             >
-              {moveToTeamBusy ? 'Moviendo…' : 'Cancelar'}
+              {moveToTeamBusy ? 'Copiando…' : 'Cancelar'}
             </button>
           </div>
         </div>
