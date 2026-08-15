@@ -32,10 +32,18 @@ export function TopBar({ title, subtitle, right }: { title: string; subtitle?: s
   );
 }
 
+const BLOB_DIAMETER = 44;
+
 export function BottomTabBar() {
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [glow, setGlow] = useState<{ x: number; visible: boolean }>({ x: 0, visible: false });
+  const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const [blob, setBlob] = useState<{ left: number; width: number; radius: number; visible: boolean }>({
+    left: 0,
+    width: BLOB_DIAMETER,
+    radius: BLOB_DIAMETER / 2,
+    visible: false,
+  });
   const [poppedHref, setPoppedHref] = useState<string | null>(null);
 
   const activeIndex = Math.max(
@@ -44,10 +52,27 @@ export function BottomTabBar() {
   );
   const pillPercent = 100 / TABS.length;
 
-  function moveGlow(clientX: number) {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setGlow({ x: clientX - rect.left, visible: true });
+  // Mide qué pestaña hay bajo el dedo. Si está dentro de una, la gota se
+  // "funde" con su rectángulo exacto (metaball); si está en el hueco entre
+  // pestañas, vuelve a ser un círculo pequeño centrado en el dedo.
+  function moveBlob(clientX: number) {
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!containerRect) return;
+    const relX = clientX - containerRect.left;
+
+    for (const el of tabRefs.current) {
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const left = r.left - containerRect.left;
+      const right = r.right - containerRect.left;
+      if (relX >= left && relX <= right) {
+        setBlob({ left, width: right - left, radius: 19, visible: true });
+        return;
+      }
+    }
+
+    const clamped = Math.min(Math.max(relX, BLOB_DIAMETER / 2), containerRect.width - BLOB_DIAMETER / 2);
+    setBlob({ left: clamped - BLOB_DIAMETER / 2, width: BLOB_DIAMETER, radius: BLOB_DIAMETER / 2, visible: true });
   }
 
   function pop(href: string) {
@@ -59,20 +84,22 @@ export function BottomTabBar() {
     <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-2.5">
       <div
         ref={containerRef}
-        onPointerDown={(e) => moveGlow(e.clientX)}
+        onPointerDown={(e) => moveBlob(e.clientX)}
         onPointerMove={(e) => {
-          if (e.buttons > 0 || e.pointerType === 'touch') moveGlow(e.clientX);
+          if (e.buttons > 0 || e.pointerType === 'touch') moveBlob(e.clientX);
         }}
-        onPointerUp={() => setGlow((g) => ({ ...g, visible: false }))}
-        onPointerLeave={() => setGlow((g) => ({ ...g, visible: false }))}
+        onPointerUp={() => setBlob((b) => ({ ...b, visible: false }))}
+        onPointerLeave={() => setBlob((b) => ({ ...b, visible: false }))}
         className="nexor-liquid-glass relative mx-auto flex w-full max-w-md items-stretch justify-between overflow-hidden rounded-[26px] px-1.5 py-1.5"
       >
-        {/* brillo que sigue al dedo */}
+        {/* gota de vidrio que sigue al dedo y se funde con cada pestaña */}
         <div
-          className="nexor-touch-glow pointer-events-none absolute top-0 left-0 h-full w-20"
+          className="nexor-touch-blob pointer-events-none absolute top-1.5 bottom-1.5"
           style={{
-            transform: `translateX(${glow.x - 40}px)`,
-            opacity: glow.visible ? 1 : 0,
+            left: blob.left,
+            width: blob.width,
+            borderRadius: blob.radius,
+            opacity: blob.visible ? 1 : 0,
           }}
         />
 
@@ -85,12 +112,15 @@ export function BottomTabBar() {
           }}
         />
 
-        {TABS.map(({ href, label, icon: Icon }) => {
+        {TABS.map(({ href, label, icon: Icon }, i) => {
           const active = pathname === href || pathname?.startsWith(href + '/');
           return (
             <Link
               key={href}
               href={href}
+              ref={(el) => {
+                tabRefs.current[i] = el;
+              }}
               onClick={() => pop(href)}
               className={`relative z-10 flex flex-1 flex-col items-center gap-1 rounded-2xl px-1 py-1.5 transition-transform active:scale-90 ${
                 poppedHref === href ? 'nexor-tab-pop' : ''
