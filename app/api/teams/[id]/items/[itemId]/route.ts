@@ -12,17 +12,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!canWrite(role)) return NextResponse.json({ error: 'Solo owner/editor pueden editar' }, { status: 403 });
 
   const body = await req.json();
-  const { encryptedBlob, itemType } = body;
+  const { encryptedBlob, itemType, folderId } = body;
   if (!encryptedBlob?.iv || !encryptedBlob?.ciphertext) {
     return NextResponse.json({ error: 'encryptedBlob inválido' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
     .from('team_vault_items')
-    .update({ encrypted_blob: JSON.stringify(encryptedBlob), item_type: itemType || 'login', updated_at: new Date().toISOString() })
+    .update({
+      encrypted_blob: JSON.stringify(encryptedBlob),
+      item_type: itemType || 'login',
+      folder_id: folderId ?? null,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', itemId)
     .eq('team_id', teamId)
-    .select('id, item_type, encrypted_blob, created_at, updated_at')
+    .select('id, item_type, encrypted_blob, folder_id, created_at, updated_at')
     .single();
 
   if (error || !data) return NextResponse.json({ error: 'No se pudo actualizar' }, { status: 404 });

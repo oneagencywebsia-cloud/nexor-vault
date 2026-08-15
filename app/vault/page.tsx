@@ -12,7 +12,6 @@ import {
   Plus,
   Lock,
   LogOut,
-  Folder,
   FolderPlus,
   FolderOpen,
   X,
@@ -20,17 +19,18 @@ import {
   Home,
   MoreHorizontal,
   FolderInput,
-  Check,
   Users2,
 } from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { encryptPrivateKey, generateKeyPair, unwrapRawKey } from '@/lib/sharing';
 import { useVaultStore } from '@/lib/store';
 import { matchBrandIcon } from '@/lib/brand-icon';
+import { collectDescendants, topDownOrder, type FolderNode } from '@/lib/folder-tree';
 import AutoLock from '@/components/AutoLock';
 import PasswordGenerator from '@/components/PasswordGenerator';
 import { AppShell } from '@/components/AppShell';
 import { BrandIcon } from '@/components/BrandIcon';
+import { FolderPicker } from '@/components/FolderPicker';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 interface VaultItemData {
@@ -62,28 +62,7 @@ interface RawFolder {
   parent_id: string | null;
 }
 
-interface DecryptedFolder {
-  id: string;
-  name: string;
-  parentId: string | null;
-}
-
-// Recorre folders y devuelve el propio id + todos sus descendientes (para
-// no permitir mover/dejar huérfano un subárbol de carpetas hacia sí mismo).
-function collectDescendants(id: string, all: DecryptedFolder[]): Set<string> {
-  const result = new Set<string>([id]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const f of all) {
-      if (f.parentId && result.has(f.parentId) && !result.has(f.id)) {
-        result.add(f.id);
-        grew = true;
-      }
-    }
-  }
-  return result;
-}
+type DecryptedFolder = FolderNode;
 
 const EMPTY_FORM: VaultItemData = { title: '', username: '', password: '', url: '', notes: '' };
 const AVATAR_TONES = ['#6c5ce7', '#8b7cf6', '#b8b3ff', '#34d399', '#fbbf24', '#fb7185'];
@@ -355,13 +334,15 @@ export default function VaultPage() {
     setMovingFolderId(null);
   }
 
-  // Copia (no mueve) una carpeta ENTERA (y sus subcarpetas) a un equipo:
-  // re-cifra cada item del subárbol con la team key y lo crea allí. La
-  // carpeta y sus items se quedan intactos en el vault personal.
+  // Copia (no mueve) una carpeta ENTERA (y sus subcarpetas) a un equipo,
+  // preservando la jerarquía: se recrea cada carpeta como team_folder
+  // (nombre cifrado con la team key) y los items quedan dentro de la
+  // carpeta correspondiente, no sueltos. El original se queda intacto en
+  // el vault personal.
   async function onMoveFolderToTeam(folderId: string, team: { id: string; wrappedTeamKey: string }) {
     if (!vaultKey) return;
     const subtree = collectDescendants(folderId, folders);
-    const itemsToCopy = items.filter((i) => i.folderId && subtree.has(i.folderId));
+    const order = topDownOrder(folderId, subtree, folders);
 
     setMoveToTeamBusy(true);
     setMoveToTeamError(null);
@@ -371,12 +352,28 @@ export default function VaultPage() {
       if (!user?.encryptedPrivateKey) throw new Error('Aún no tienes claves de compartir configuradas');
       const teamKey = await unwrapRawKey(vaultKey, user.encryptedPrivateKey, team.wrappedTeamKey);
 
+      const idMap = new Map<string, string>(); // id de carpeta personal -> id de team_folder creado
+      for (const fid of order) {
+        const f = folderMap.get(fid)!;
+        const encryptedName = await encryptJson(teamKey, { name: f.name });
+        const parentId = f.parentId ? (idMap.get(f.parentId) ?? null) : null;
+        const res = await fetch(`/api/teams/${team.id}/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encryptedName, parentId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `No se pudo crear la carpeta "${f.name}" en el equipo`);
+        idMap.set(fid, data.folder.id);
+      }
+
+      const itemsToCopy = items.filter((i) => i.folderId && subtree.has(i.folderId));
       for (const item of itemsToCopy) {
         const encryptedBlob = await encryptJson(teamKey, item.data);
         const res = await fetch(`/api/teams/${team.id}/items`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemType: 'login', encryptedBlob }),
+          body: JSON.stringify({ itemType: 'login', encryptedBlob, folderId: idMap.get(item.folderId!) }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `No se pudo copiar "${item.data.title || 'un item'}"`);
@@ -940,57 +937,6 @@ export default function VaultPage() {
         </div>
       )}
     </AppShell>
-  );
-}
-
-// Lista plana e indentada de todas las carpetas (excluyendo la que se está
-// moviendo y sus descendientes, para no crear un ciclo), con "Raíz" arriba.
-function FolderPicker({
-  folders,
-  excludeIds,
-  currentParentId,
-  onPick,
-}: {
-  folders: DecryptedFolder[];
-  excludeIds: Set<string>;
-  currentParentId: string | null;
-  onPick: (id: string | null) => void;
-}) {
-  function depthOf(id: string): number {
-    let depth = 0;
-    let cur = folders.find((f) => f.id === id);
-    while (cur?.parentId) {
-      depth++;
-      cur = folders.find((f) => f.id === cur!.parentId);
-    }
-    return depth;
-  }
-
-  const options = folders.filter((f) => !excludeIds.has(f.id));
-
-  return (
-    <div className="space-y-0.5">
-      <button
-        onClick={() => onPick(null)}
-        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium active:bg-surface-2 ${
-          currentParentId === null ? 'text-purple' : 'text-foreground'
-        }`}
-      >
-        <Home size={15} /> Raíz {currentParentId === null && <Check size={14} className="ml-auto" />}
-      </button>
-      {options.map((f) => (
-        <button
-          key={f.id}
-          onClick={() => onPick(f.id)}
-          style={{ paddingLeft: `${12 + depthOf(f.id) * 18}px` }}
-          className={`flex w-full items-center gap-2 rounded-xl py-2.5 pr-3 text-left text-[14px] font-medium active:bg-surface-2 ${
-            currentParentId === f.id ? 'text-purple' : 'text-foreground'
-          }`}
-        >
-          <Folder size={15} /> {f.name} {currentParentId === f.id && <Check size={14} className="ml-auto" />}
-        </button>
-      ))}
-    </div>
   );
 }
 

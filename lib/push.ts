@@ -48,3 +48,16 @@ export async function sendPushToUser(userId: string, payload: PushPayload) {
     }),
   );
 }
+
+// Notifica a todos los miembros de un equipo salvo al que disparó la acción
+// (p.ej. quien añadió el item/carpeta no necesita que se lo digan a sí mismo).
+export async function sendPushToTeamMembers(teamId: string, excludeUserId: string, payload: PushPayload) {
+  const { data: members } = await supabaseAdmin
+    .from('team_members')
+    .select('user_id')
+    .eq('team_id', teamId)
+    .neq('user_id', excludeUserId);
+  if (!members?.length) return;
+
+  await Promise.all(members.map((m) => sendPushToUser(m.user_id, payload)));
+}

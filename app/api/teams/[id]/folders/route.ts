@@ -13,13 +13,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!role) return NextResponse.json({ error: 'No eres miembro de este equipo' }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
-    .from('team_vault_items')
-    .select('id, item_type, encrypted_blob, folder_id, created_at, updated_at')
+    .from('team_folders')
+    .select('id, encrypted_name, parent_id, created_at')
     .eq('team_id', teamId)
-    .order('updated_at', { ascending: false });
+    .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: 'Error leyendo el vault del equipo' }, { status: 500 });
-  return NextResponse.json({ items: data });
+  if (error) return NextResponse.json({ error: 'Error leyendo carpetas del equipo' }, { status: 500 });
+  return NextResponse.json({ folders: data });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,33 +28,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: teamId } = await params;
 
   const role = await getTeamMembership(teamId, session.userId);
-  if (!canWrite(role)) return NextResponse.json({ error: 'Solo owner/editor pueden añadir items' }, { status: 403 });
+  if (!canWrite(role)) return NextResponse.json({ error: 'Solo owner/editor pueden crear carpetas' }, { status: 403 });
 
   const body = await req.json();
-  const { itemType, encryptedBlob, folderId } = body;
-  if (!encryptedBlob?.iv || !encryptedBlob?.ciphertext) {
-    return NextResponse.json({ error: 'encryptedBlob inválido' }, { status: 400 });
+  const { encryptedName, parentId } = body;
+  if (!encryptedName?.iv || !encryptedName?.ciphertext) {
+    return NextResponse.json({ error: 'encryptedName inválido' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
-    .from('team_vault_items')
-    .insert({
-      team_id: teamId,
-      item_type: itemType || 'login',
-      encrypted_blob: JSON.stringify(encryptedBlob),
-      folder_id: folderId || null,
-      created_by: session.userId,
-    })
-    .select('id, item_type, encrypted_blob, folder_id, created_at, updated_at')
+    .from('team_folders')
+    .insert({ team_id: teamId, encrypted_name: JSON.stringify(encryptedName), parent_id: parentId || null })
+    .select('id, encrypted_name, parent_id, created_at')
     .single();
 
-  if (error || !data) return NextResponse.json({ error: 'No se pudo crear el item' }, { status: 500 });
+  if (error || !data) return NextResponse.json({ error: 'No se pudo crear la carpeta' }, { status: 500 });
 
   sendPushToTeamMembers(teamId, session.userId, {
-    title: 'Nuevo item en el equipo',
-    body: 'Se ha añadido un item al vault del equipo.',
+    title: 'Nueva carpeta en el equipo',
+    body: 'Se ha añadido una carpeta al vault del equipo.',
     url: `/teams/${teamId}`,
   }).catch(() => {});
 
-  return NextResponse.json({ item: data });
+  return NextResponse.json({ folder: data });
 }
