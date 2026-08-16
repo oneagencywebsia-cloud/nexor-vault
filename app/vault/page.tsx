@@ -20,6 +20,13 @@ import {
   MoreHorizontal,
   FolderInput,
   Users2,
+  AtSign,
+  KeyRound,
+  Globe,
+  StickyNote,
+  Clock,
+  ShieldCheck,
+  Check,
 } from 'lucide-react';
 import { decryptJson, encryptJson, EncryptedBlob } from '@/lib/crypto';
 import { encryptPrivateKey, generateKeyPair, unwrapRawKey } from '@/lib/sharing';
@@ -90,6 +97,8 @@ export default function VaultPage() {
   const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
   const [writeableTeams, setWriteableTeams] = useState<{ id: string; name: string; wrappedTeamKey: string }[]>([]);
   const [movingItemId, setMovingItemId] = useState<string | null>(null);
+  const [movingItemFolderId, setMovingItemFolderId] = useState<string | null>(null);
+  const [movingItemFolderBusy, setMovingItemFolderBusy] = useState(false);
   const [moveToTeamBusy, setMoveToTeamBusy] = useState(false);
   const [moveToTeamError, setMoveToTeamError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,6 +108,9 @@ export default function VaultPage() {
   const [formFolderId, setFormFolderId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [revealId, setRevealId] = useState<string | null>(null);
+  const [viewItemId, setViewItemId] = useState<string | null>(null);
+  const [viewReveal, setViewReveal] = useState(false);
+  const [viewCopiedField, setViewCopiedField] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -446,6 +458,29 @@ export default function VaultPage() {
     if (res.ok) setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
+  // Mueve un item suelto a una carpeta (o a la raíz): se re-cifra con la
+  // misma vault key, solo cambia folder_id.
+  async function onMoveItemFolder(id: string, newFolderId: string | null) {
+    if (!vaultKey) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    setMovingItemFolderBusy(true);
+    try {
+      const encryptedBlob = await encryptJson(vaultKey, item.data);
+      const res = await fetch(`/api/vault/items/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ encryptedBlob, folderId: newFolderId }),
+      });
+      if (res.ok) {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, folderId: newFolderId } : i)));
+      }
+    } finally {
+      setMovingItemFolderBusy(false);
+      setMovingItemFolderId(null);
+    }
+  }
+
   // Mueve un item del vault personal al vault de un equipo: se re-cifra
   // localmente con la team key (desenvuelta con la clave privada propia)
   // y solo entonces se crea allí y se borra del vault personal — el
@@ -492,6 +527,24 @@ export default function VaultPage() {
   function copy(text: string) {
     navigator.clipboard.writeText(text);
   }
+
+  function copyWithFeedback(text: string, field: string) {
+    copy(text);
+    setViewCopiedField(field);
+    setTimeout(() => setViewCopiedField((f) => (f === field ? null : f)), 1200);
+  }
+
+  function formatUpdated(iso: string) {
+    return new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  const viewItem = viewItemId ? items.find((i) => i.id === viewItemId) : undefined;
 
   if (!unlocked || !vaultKey) {
     return <div className="flex flex-1 items-center justify-center bg-void text-dim">Cargando…</div>;
@@ -660,7 +713,14 @@ export default function VaultPage() {
           const brand = matchBrandIcon(item.data.title);
           const tone = brand?.hex ?? avatarTone(item.data.title || item.id);
           return (
-            <li key={item.id} className="rounded-2xl border border-line bg-surface/70 p-4">
+            <li
+              key={item.id}
+              onClick={() => {
+                setViewReveal(false);
+                setViewItemId(item.id);
+              }}
+              className="cursor-pointer rounded-2xl border border-line bg-surface/70 p-4 transition-transform active:scale-[0.985]"
+            >
               <div className="flex items-center gap-3">
                 <div
                   className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[15px] font-bold text-white"
@@ -678,7 +738,10 @@ export default function VaultPage() {
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2"
+              >
                 <span className="truncate font-mono text-[13px] text-mist">
                   {revealId === item.id ? item.data.password : '••••••••••••'}
                 </span>
@@ -692,6 +755,9 @@ export default function VaultPage() {
                   <IconBtn onClick={() => openEdit(item)} label="Editar">
                     <Pencil size={15} />
                   </IconBtn>
+                  <IconBtn onClick={() => setMovingItemFolderId(item.id)} label="Mover a carpeta">
+                    <FolderInput size={15} />
+                  </IconBtn>
                   {writeableTeams.length > 0 && (
                     <IconBtn onClick={() => setMovingItemId(item.id)} label="Copiar a equipo">
                       <Users2 size={15} />
@@ -703,7 +769,11 @@ export default function VaultPage() {
                 </div>
               </div>
 
-              {item.data.totpSecret && <TotpCode secret={item.data.totpSecret} />}
+              {item.data.totpSecret && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <TotpCode secret={item.data.totpSecret} />
+                </div>
+              )}
             </li>
           );
         })}
@@ -961,6 +1031,207 @@ export default function VaultPage() {
           </div>
         </div>
       )}
+
+      {/* mover item suelto a una carpeta del vault personal */}
+      {movingItemFolderId && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          onClick={() => !movingItemFolderBusy && setMovingItemFolderId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="safe-bottom max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-t-[28px] border border-line bg-surface p-4 sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+            <p className="mb-1 px-2 text-[13.5px] font-semibold text-foreground">Mover a carpeta…</p>
+            <FolderPicker
+              folders={folders}
+              excludeIds={new Set()}
+              currentParentId={items.find((i) => i.id === movingItemFolderId)?.folderId ?? null}
+              onPick={(newFolderId) => onMoveItemFolder(movingItemFolderId, newFolderId)}
+            />
+            <button
+              onClick={() => setMovingItemFolderId(null)}
+              disabled={movingItemFolderBusy}
+              className="mt-1 w-full rounded-xl border border-line-strong py-3 text-[14px] font-semibold text-foreground disabled:opacity-50"
+            >
+              {movingItemFolderBusy ? 'Moviendo…' : 'Cancelar'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ficha de detalle del item: se abre al tocar la tarjeta */}
+      {viewItem && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          onClick={() => setViewItemId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="safe-bottom max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-[28px] border border-line bg-surface sm:rounded-[28px]"
+          >
+            <div className="mx-auto -mt-1 mb-1 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
+
+            {/* cabecera con degradado del color de marca/avatar */}
+            <div
+              className="relative flex flex-col items-center gap-2 px-6 pb-6 pt-5 text-center"
+              style={{
+                background: `linear-gradient(180deg, ${
+                  matchBrandIcon(viewItem.data.title)?.hex ?? avatarTone(viewItem.data.title || viewItem.id)
+                }26, transparent)`,
+              }}
+            >
+              <button
+                onClick={() => setViewItemId(null)}
+                aria-label="Cerrar"
+                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-dim active:scale-90"
+              >
+                <X size={15} />
+              </button>
+              {(() => {
+                const brand = matchBrandIcon(viewItem.data.title);
+                const tone = brand?.hex ?? avatarTone(viewItem.data.title || viewItem.id);
+                return (
+                  <div
+                    className="grid h-16 w-16 place-items-center rounded-2xl text-[24px] font-bold text-white shadow-lg"
+                    style={{ background: brand ? `${tone}26` : tone, color: brand ? tone : undefined }}
+                  >
+                    {brand ? (
+                      <BrandIcon slug={brand.slug} className="block h-8 w-8 [&_svg]:h-full [&_svg]:w-full" />
+                    ) : (
+                      (viewItem.data.title || '?').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                );
+              })()}
+              <h2 className="text-[18px] font-bold text-foreground">{viewItem.data.title || '(sin título)'}</h2>
+              <p className="text-[12.5px] text-dim">
+                {viewItem.folderId ? folderMap.get(viewItem.folderId)?.name ?? 'Carpeta' : 'Vault'} · actualizado{' '}
+                {formatUpdated(viewItem.updatedAt)}
+              </p>
+            </div>
+
+            <div className="space-y-2 px-5 pb-5">
+              {viewItem.data.totpSecret && (
+                <div className="mb-1">
+                  <TotpCode secret={viewItem.data.totpSecret} />
+                </div>
+              )}
+
+              {viewItem.data.username && (
+                <DetailField
+                  icon={<AtSign size={15} />}
+                  label="Usuario"
+                  value={viewItem.data.username}
+                  copied={viewCopiedField === 'username'}
+                  onCopy={() => copyWithFeedback(viewItem.data.username, 'username')}
+                />
+              )}
+
+              {viewItem.data.password && (
+                <DetailField
+                  icon={<KeyRound size={15} />}
+                  label="Contraseña"
+                  value={viewReveal ? viewItem.data.password : '••••••••••••'}
+                  mono
+                  copied={viewCopiedField === 'password'}
+                  onCopy={() => copyWithFeedback(viewItem.data.password, 'password')}
+                  extra={
+                    <IconBtn onClick={() => setViewReveal((v) => !v)} label={viewReveal ? 'Ocultar' : 'Ver'}>
+                      {viewReveal ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </IconBtn>
+                  }
+                />
+              )}
+
+              {viewItem.data.url && (
+                <DetailField
+                  icon={<Globe size={15} />}
+                  label="URL"
+                  value={viewItem.data.url}
+                  copied={viewCopiedField === 'url'}
+                  onCopy={() => copyWithFeedback(viewItem.data.url, 'url')}
+                  extra={
+                    <a
+                      href={viewItem.data.url.startsWith('http') ? viewItem.data.url : `https://${viewItem.data.url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label="Abrir enlace"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-dim active:scale-90"
+                    >
+                      <ChevronRight size={15} />
+                    </a>
+                  }
+                />
+              )}
+
+              {viewItem.data.notes && (
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+                  <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-dim">
+                    <StickyNote size={13} /> Notas
+                  </div>
+                  <p className="whitespace-pre-wrap text-[13.5px] text-foreground">{viewItem.data.notes}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5 px-1 pt-1 text-[11.5px] text-dim">
+                <Clock size={12} /> Actualizado el {formatUpdated(viewItem.updatedAt)}
+                {viewItem.data.totpSecret && (
+                  <span className="ml-auto flex items-center gap-1 text-purple">
+                    <ShieldCheck size={12} /> 2FA activo
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setViewItemId(null);
+                    openEdit(viewItem);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-2xl border border-line-strong py-3 text-[13.5px] font-semibold text-foreground active:scale-[0.98]"
+                >
+                  <Pencil size={14} /> Editar
+                </button>
+                <button
+                  onClick={() => {
+                    setViewItemId(null);
+                    setMovingItemFolderId(viewItem.id);
+                  }}
+                  className="flex items-center justify-center gap-1.5 rounded-2xl border border-line-strong py-3 text-[13.5px] font-semibold text-foreground active:scale-[0.98]"
+                >
+                  <FolderInput size={14} /> Mover
+                </button>
+                {writeableTeams.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setViewItemId(null);
+                      setMoveToTeamError(null);
+                      setMovingItemId(viewItem.id);
+                    }}
+                    className="flex items-center justify-center gap-1.5 rounded-2xl border border-line-strong py-3 text-[13.5px] font-semibold text-foreground active:scale-[0.98]"
+                  >
+                    <Users2 size={14} /> A equipo
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setViewItemId(null);
+                    onDelete(viewItem.id);
+                  }}
+                  className={`flex items-center justify-center gap-1.5 rounded-2xl border border-line-strong py-3 text-[13.5px] font-semibold text-danger active:scale-[0.98] ${
+                    writeableTeams.length > 0 ? '' : 'col-span-1'
+                  }`}
+                >
+                  <Trash2 size={14} /> Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
@@ -986,5 +1257,37 @@ function IconBtn({
     >
       {children}
     </button>
+  );
+}
+
+function DetailField({
+  icon,
+  label,
+  value,
+  onCopy,
+  copied,
+  mono,
+  extra,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  onCopy: () => void;
+  copied: boolean;
+  mono?: boolean;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
+      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-dim">{label}</p>
+        <p className={`truncate text-[14px] text-foreground ${mono ? 'font-mono' : ''}`}>{value}</p>
+      </div>
+      {extra}
+      <IconBtn onClick={onCopy} label={`Copiar ${label}`}>
+        {copied ? <Check size={15} className="text-purple" /> : <Copy size={15} />}
+      </IconBtn>
+    </div>
   );
 }
