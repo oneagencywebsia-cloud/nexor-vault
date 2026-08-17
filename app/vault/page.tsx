@@ -738,6 +738,13 @@ export default function VaultPage() {
                 </div>
               </div>
 
+              {item.data.notes && (
+                <p className="mt-2 line-clamp-2 flex items-start gap-1.5 text-[12px] leading-snug text-dim/80">
+                  <StickyNote size={12} className="mt-0.5 shrink-0 text-dim/60" />
+                  <span className="italic">{item.data.notes}</span>
+                </p>
+              )}
+
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2"
@@ -791,77 +798,118 @@ export default function VaultPage() {
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
           <form
             onSubmit={onSave}
-            className="safe-bottom w-full max-w-md space-y-3 rounded-t-[28px] border border-line bg-surface p-6 sm:rounded-[28px]"
+            className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[28px] border border-line bg-surface sm:rounded-[28px]"
           >
-            <div className="mx-auto -mt-1 mb-2 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
-            <h2 className="text-[17px] font-bold text-foreground">{editingId ? 'Editar item' : 'Nuevo item'}</h2>
+            <div className="mx-auto -mt-1 mb-1 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" />
 
-            <input
-              placeholder="Título"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-              className={inputClass}
-            />
-            <input
-              placeholder="Usuario / email"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
-              className={inputClass}
-            />
-            <input
-              placeholder="Contraseña"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className={`${inputClass} font-mono`}
-            />
+            {/* cabecera con avatar en vivo: cambia con el título mientras escribes */}
+            {(() => {
+              const brand = matchBrandIcon(form.title);
+              const tone = brand?.hex ?? avatarTone(form.title || 'x');
+              return (
+                <div
+                  className="flex flex-col items-center gap-2 px-6 pb-5 pt-4 text-center"
+                  style={{ background: `linear-gradient(180deg, ${tone}26, transparent)` }}
+                >
+                  <div
+                    className="grid h-14 w-14 place-items-center rounded-2xl text-[22px] font-bold text-white shadow-lg transition-colors"
+                    style={{ background: brand ? `${tone}26` : tone, color: brand ? tone : undefined }}
+                  >
+                    {brand ? (
+                      <BrandIcon slug={brand.slug} className="block h-7 w-7 [&_svg]:h-full [&_svg]:w-full" />
+                    ) : (
+                      (form.title || '?').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <h2 className="text-[16px] font-bold text-foreground">{editingId ? 'Editar item' : 'Nuevo item'}</h2>
+                </div>
+              );
+            })()}
 
-            <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
+            <div className="space-y-2 px-5 pb-6">
+              <FormField icon={<KeyRound size={15} />} label="Título">
+                <input
+                  placeholder="ej. Instagram, Gmail…"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  required
+                  autoFocus
+                  className="w-full bg-transparent text-[14px] text-foreground outline-none placeholder:text-dim/50"
+                />
+              </FormField>
 
-            <TotpSecretInput value={form.totpSecret ?? ''} onChange={(secret) => setForm((f) => ({ ...f, totpSecret: secret }))} />
+              <FormField icon={<AtSign size={15} />} label="Usuario / email">
+                <input
+                  placeholder="tu@email.com"
+                  value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  className="w-full bg-transparent text-[14px] text-foreground outline-none placeholder:text-dim/50"
+                />
+              </FormField>
 
-            {folders.length > 0 && (
-              <select
-                value={formFolderId ?? ''}
-                onChange={(e) => setFormFolderId(e.target.value || null)}
-                className={inputClass}
-              >
-                <option value="">Sin carpeta</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            )}
+              <FormField icon={<ShieldCheck size={15} />} label="Contraseña">
+                <input
+                  placeholder="••••••••"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full bg-transparent font-mono text-[14px] text-foreground outline-none placeholder:text-dim/50"
+                />
+              </FormField>
 
-            <input
-              placeholder="URL"
-              value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
-              className={inputClass}
-            />
-            <textarea
-              placeholder="Notas"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              rows={3}
-              className={inputClass}
-            />
+              <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
 
-            {error && <p className="text-[13px] text-danger">{error}</p>}
+              <TotpSecretInput value={form.totpSecret ?? ''} onChange={(secret) => setForm((f) => ({ ...f, totpSecret: secret }))} />
 
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="flex-1 rounded-2xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
-              >
-                Cancelar
-              </button>
-              <button type="submit" className={`${primaryButtonClass} flex-1`}>
-                Guardar
-              </button>
+              {folders.length > 0 && (
+                <FormField icon={<FolderOpen size={15} />} label="Carpeta">
+                  <select
+                    value={formFolderId ?? ''}
+                    onChange={(e) => setFormFolderId(e.target.value || null)}
+                    className="w-full bg-transparent text-[14px] text-foreground outline-none [&>option]:bg-surface"
+                  >
+                    <option value="">Sin carpeta</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              )}
+
+              <FormField icon={<Globe size={15} />} label="URL">
+                <input
+                  placeholder="https://…"
+                  value={form.url}
+                  onChange={(e) => setForm({ ...form, url: e.target.value })}
+                  className="w-full bg-transparent text-[14px] text-foreground outline-none placeholder:text-dim/50"
+                />
+              </FormField>
+
+              <FormField icon={<StickyNote size={15} />} label="Notas">
+                <textarea
+                  placeholder="Notas opcionales…"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  rows={2}
+                  className="w-full resize-none bg-transparent text-[14px] text-foreground outline-none placeholder:text-dim/50"
+                />
+              </FormField>
+
+              {error && <p className="text-[13px] text-danger">{error}</p>}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="flex-1 rounded-2xl border border-line-strong py-3 text-[14px] font-semibold text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className={`${primaryButtonClass} flex-1`}>
+                  Guardar
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -1257,6 +1305,26 @@ function IconBtn({
     >
       {children}
     </button>
+  );
+}
+
+function FormField({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-surface-2 px-3 py-2 transition-colors focus-within:bg-line">
+      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <label className="block text-[10.5px] font-semibold uppercase tracking-wide text-dim">{label}</label>
+        {children}
+      </div>
+    </div>
   );
 }
 
