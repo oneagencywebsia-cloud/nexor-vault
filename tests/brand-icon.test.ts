@@ -37,10 +37,11 @@ describe('matchBrandIcon', () => {
     expect(matchBrandIcon('')).toBeNull();
   });
 
-  it('reconoce marcas grandes ausentes de simple-icons con una insignia de iniciales', () => {
+  it('reconoce marcas grandes ausentes de simple-icons con logo real (Font Awesome) o insignia', () => {
     expect(abbrOf('Outlook')).toBe('Ou');
-    expect(abbrOf('Microsoft')).toBe('Ms');
-    expect(abbrOf('LinkedIn')).toBe('in');
-    expect(abbrOf('Cuenta de Amazon')).toBe('a');
+    expect(abbrOf('Adobe')).toBe('Ad');
+    expect(slugOf('Microsoft')).toBe('fa-microsoft');
+    expect(slugOf('LinkedIn')).toBe('fa-linkedin');
+    expect(slugOf('Cuenta de Amazon')).toBe('fa-amazon');
   });
 });
