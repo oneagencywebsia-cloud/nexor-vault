@@ -45,3 +45,6 @@ next-env.d.ts
 # de simple-icons — no se commitea, se regenera siempre desde node_modules
 /public/brand-icons/
 /lib/generated/
+
+.vercel
+.env*
