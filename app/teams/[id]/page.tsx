@@ -22,7 +22,7 @@ import { useVaultStore } from '@/lib/store';
 import { matchBrandIcon } from '@/lib/brand-icon';
 import { collectDescendants, type FolderNode } from '@/lib/folder-tree';
 import { AppShell } from '@/components/AppShell';
-import { BrandIcon } from '@/components/BrandIcon';
+import { BrandGlyph } from '@/components/BrandIcon';
 import { FolderPicker } from '@/components/FolderPicker';
 import { TotpCode } from '@/components/TotpCode';
 import { TotpSecretInput } from '@/components/TotpSecretInput';
@@ -476,11 +476,12 @@ export default function TeamDetailPage() {
                   )}
                   <button onClick={() => setActiveFolderId(f.id)} className="flex flex-col items-center gap-1.5">
                     <div className="grid h-11 w-11 place-items-center rounded-2xl" style={{ background: `${tone}26`, color: tone }}>
-                      {brand ? (
-                        <BrandIcon slug={brand.slug} className="block h-5 w-5 [&_svg]:h-full [&_svg]:w-full" />
-                      ) : (
-                        <FolderOpen size={20} />
-                      )}
+                      <BrandGlyph
+                        brand={brand}
+                        iconClass="block h-5 w-5 [&_svg]:h-full [&_svg]:w-full"
+                        textClass="text-[13px]"
+                        fallback={<FolderOpen size={20} />}
+                      />
                     </div>
                     <span className="max-w-full truncate text-[12.5px] font-semibold text-foreground">{f.name}</span>
                     <span className="text-[10.5px] text-dim">
@@ -549,11 +550,11 @@ export default function TeamDetailPage() {
                         className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[13px] font-bold text-white"
                         style={{ background: brand ? `${tone}26` : tone, color: brand ? tone : undefined }}
                       >
-                        {brand ? (
-                          <BrandIcon slug={brand.slug} className="block h-4.5 w-4.5 [&_svg]:h-full [&_svg]:w-full" />
-                        ) : (
-                          (item.data.title || '?').charAt(0).toUpperCase()
-                        )}
+                        <BrandGlyph
+                          brand={brand}
+                          iconClass="block h-4.5 w-4.5 [&_svg]:h-full [&_svg]:w-full"
+                          fallback={(item.data.title || '?').charAt(0).toUpperCase()}
+                        />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-[14.5px] font-semibold text-foreground">{item.data.title || '(sin título)'}</p>

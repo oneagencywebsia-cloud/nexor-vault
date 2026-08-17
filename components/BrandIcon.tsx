@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { BrandMatch } from '@/lib/brand-icon';
 
 const svgCache = new Map<string, string>();
 
@@ -30,4 +31,23 @@ export function BrandIcon({ slug, className }: { slug: string; className?: strin
 
   if (!cached) return null;
   return <span className={className} dangerouslySetInnerHTML={{ __html: cached }} />;
+}
+
+// Icono real (simple-icons) si hay match 'svg', insignia de iniciales con
+// el color de marca si es 'mono' (marcas sin logo redistribuible: ver
+// EXTRA_BRANDS en lib/brand-icon.ts), o el fallback genérico si no hay match.
+export function BrandGlyph({
+  brand,
+  fallback,
+  iconClass,
+  textClass = '',
+}: {
+  brand: BrandMatch | null;
+  fallback: React.ReactNode;
+  iconClass: string;
+  textClass?: string;
+}) {
+  if (brand?.kind === 'svg') return <BrandIcon slug={brand.slug} className={iconClass} />;
+  if (brand?.kind === 'mono') return <span className={`font-bold leading-none ${textClass}`}>{brand.abbr}</span>;
+  return <>{fallback}</>;
 }
