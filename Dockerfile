@@ -11,16 +11,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js necesita SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en build time
-# (lib/supabase-admin.ts falla al importarse si faltan, y Next evalúa todas
-# las rutas API durante "Collecting page data"). NEXT_PUBLIC_VAPID_PUBLIC_KEY
-# también hace falta en build porque se incrusta en el bundle del cliente.
-# En Easypanel: marcar estas variables como disponibles en build time.
-ARG SUPABASE_URL
-ARG SUPABASE_SERVICE_ROLE_KEY
+# NEXT_PUBLIC_VAPID_PUBLIC_KEY se incrusta en el bundle del cliente en build
+# time (no es secreta, su nombre lo dice: PUBLIC). El resto de env vars
+# (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SESSION_SECRET, VAPID_PRIVATE_KEY)
+# solo hacen falta en runtime — configúralas en Easypanel como variables de
+# entorno normales del servicio.
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
-ENV SUPABASE_URL=$SUPABASE_URL
-ENV SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
 ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 RUN npm run build
