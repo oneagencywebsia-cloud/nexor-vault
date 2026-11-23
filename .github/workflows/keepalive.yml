@@ -1,0 +1,18 @@
+name: Keep Supabase awake
+
+# Supabase pausa los proyectos gratuitos tras 7 días sin actividad.
+# Este workflow llama cada 2 días a un endpoint público de Nexor que consulta
+# la base (app_users), así el proyecto registra actividad. No usa secretos.
+on:
+  schedule:
+    - cron: '17 6 */2 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Nexor (hits Supabase)
+        run: |
+          curl --fail --silent --show-error --max-time 30 --retry 3 --retry-delay 10 \
+            "https://software-nexor.p08ks6.easypanel.host/api/auth/salt?email=keepalive@example.com"
