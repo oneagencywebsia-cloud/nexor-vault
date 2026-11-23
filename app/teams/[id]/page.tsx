@@ -685,7 +685,7 @@ export default function TeamDetailPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6">
           <form
             onSubmit={onSaveItem}
             className="safe-bottom w-full max-w-md space-y-3 rounded-t-[28px] border border-line bg-surface p-6 sm:rounded-[28px]"
@@ -755,7 +755,7 @@ export default function TeamDetailPage() {
       {/* hoja de acciones de carpeta */}
       {actionFolderId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => setActionFolderId(null)}
         >
           <div
@@ -797,7 +797,7 @@ export default function TeamDetailPage() {
 
       {/* renombrar carpeta */}
       {renamingFolderId && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -827,7 +827,7 @@ export default function TeamDetailPage() {
       {/* mover carpeta */}
       {movingFolderId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => setMovingFolderId(null)}
         >
           <div

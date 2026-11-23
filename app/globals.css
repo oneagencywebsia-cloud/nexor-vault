@@ -2,22 +2,24 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta Nexor */
-  --nexor-void: #0b0d10; /* fondo base */
-  --nexor-surface: #151821; /* superficie elevada (cards, sheets) */
-  --nexor-surface-2: #1c2029; /* superficie sobre superficie (modales, inputs) */
-  --nexor-line: rgba(233, 233, 237, 0.08); /* bordes sutiles */
-  --nexor-line-strong: rgba(233, 233, 237, 0.16);
+  /* Paleta Nexor — tema claro: fondo blanco como las marcas de confianza,
+     el violeta de marca queda como único color de acción. */
+  --nexor-void: #ffffff; /* fondo base */
+  --nexor-surface: #f7f7fc; /* tarjetas */
+  --nexor-surface-2: #eeeef8; /* inputs y superficies sobre tarjeta */
+  --nexor-line: rgba(20, 22, 31, 0.08); /* bordes sutiles */
+  --nexor-line-strong: rgba(20, 22, 31, 0.16);
   --nexor-purple: #6c5ce7; /* primario */
   --nexor-purple-bright: #8b7cf6;
-  --nexor-lavender: #b8b3ff; /* acento claro */
-  --nexor-mist: #e9e9ed; /* texto secundario sobre oscuro */
+  --nexor-purple-deep: #4c3fc4;
+  --nexor-lavender: #8b7cf6; /* acento (iconos) */
+  --nexor-mist: #3d4052; /* texto secundario */
   --nexor-white: #ffffff;
-  --nexor-text: #f3f3f6;
-  --nexor-text-dim: #9a9ba8;
-  --nexor-success: #34d399;
-  --nexor-warning: #fbbf24;
-  --nexor-danger: #fb7185;
+  --nexor-text: #14161f;
+  --nexor-text-dim: #667085;
+  --nexor-success: #059669;
+  --nexor-warning: #d97706;
+  --nexor-danger: #e11d48;
 
   --background: var(--nexor-void);
   --foreground: var(--nexor-text);
@@ -33,6 +35,7 @@
   --color-line-strong: var(--nexor-line-strong);
   --color-purple: var(--nexor-purple);
   --color-purple-bright: var(--nexor-purple-bright);
+  --color-purple-deep: var(--nexor-purple-deep);
   --color-lavender: var(--nexor-lavender);
   --color-mist: var(--nexor-mist);
   --color-dim: var(--nexor-text-dim);
@@ -49,11 +52,19 @@
 
 html {
   background: var(--nexor-void);
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
   /* deja que la web app "respire" bajo el notch/home-indicator en iOS standalone */
   height: -webkit-fill-available;
 }
 
 body {
+  /* respeta el notch en horizontal (iPhone en apaisado) */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -67,13 +78,13 @@ body {
   color: white;
 }
 
-/* Scrollbar discreto, coherente con superficies oscuras */
+/* Scrollbar discreto sobre fondo claro */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--nexor-surface-2);
+  background: #d9d9ea;
   border-radius: 999px;
   border: 2px solid var(--nexor-void);
 }
@@ -84,29 +95,27 @@ body {
 /* Fondo con textura de red — eco del patrón de marca (nodos + líneas) */
 .nexor-mesh-bg {
   background-image:
-    radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.16), transparent 40%),
-    radial-gradient(circle at 85% 0%, rgba(184, 179, 255, 0.12), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(108, 92, 231, 0.1), transparent 50%);
+    radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.1), transparent 42%),
+    radial-gradient(circle at 85% 0%, rgba(139, 124, 246, 0.09), transparent 46%),
+    radial-gradient(circle at 50% 100%, rgba(108, 92, 231, 0.06), transparent 52%);
 }
 
 .nexor-glass {
-  background: rgba(21, 24, 33, 0.72);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  backdrop-filter: blur(20px) saturate(150%);
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* Liquid Glass (iOS 26): vidrio refractivo translúcido, blur + saturación
-   altas, con un filo superior de luz para simular el reflejo del borde.
-   Alpha baja a propósito — cuanto más transparente, más "vidrio" real y
-   menos "panel oscuro sólido" se ve. */
+/* Liquid Glass sobre claro: vidrio blanco translúcido con filo de luz arriba
+   y sombra suave violeta debajo. */
 .nexor-liquid-glass {
-  background: linear-gradient(180deg, rgba(32, 36, 46, 0.22), rgba(18, 21, 29, 0.34));
-  -webkit-backdrop-filter: blur(26px) saturate(200%);
-  backdrop-filter: blur(26px) saturate(200%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(244, 243, 255, 0.7));
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 16px 44px -14px rgba(0, 0, 0, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(20, 22, 31, 0.07),
+    0 16px 40px -14px rgba(76, 63, 196, 0.35);
 }
 
 /* Píldora activa que se desliza entre pestañas con rebote elástico. */
@@ -114,26 +123,21 @@ body {
   transition: left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Gota de vidrio que sigue al dedo: es un círculo pequeño entre pestañas y
-   se "funde" hasta ocupar el tamaño exacto de la pestaña que tiene debajo
-   (metaball / liquid glass merge), encogiéndose de nuevo al salir de ella.
-   Gradiente radial + doble sombra interior para simular una gota real: luz
-   entrando por arriba-izquierda, sombra de contacto abajo, borde nítido. */
+/* Gota de vidrio que sigue al dedo y se "funde" con la pestaña de debajo. */
 .nexor-touch-blob {
   background: radial-gradient(
     130% 150% at 28% 18%,
-    rgba(255, 255, 255, 0.65),
-    rgba(255, 255, 255, 0.22) 45%,
-    rgba(255, 255, 255, 0.08) 100%
+    rgba(255, 255, 255, 0.95),
+    rgba(139, 124, 246, 0.22) 55%,
+    rgba(108, 92, 231, 0.16) 100%
   );
   -webkit-backdrop-filter: blur(10px) saturate(180%);
   backdrop-filter: blur(10px) saturate(180%);
   box-shadow:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.75),
-    inset 0 -7px 12px -5px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
-    0 6px 18px -4px rgba(255, 255, 255, 0.18),
-    0 2px 10px -2px rgba(0, 0, 0, 0.35);
+    inset 0 1.5px 1px rgba(255, 255, 255, 1),
+    inset 0 -7px 12px -5px rgba(76, 63, 196, 0.22),
+    inset 0 0 0 1px rgba(108, 92, 231, 0.25),
+    0 6px 18px -4px rgba(108, 92, 231, 0.3);
   transition:
     left 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
     width 0.34s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -177,4 +181,389 @@ body {
 }
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ───────────── Transiciones entre pantallas ─────────────
+   `app/template.tsx` se vuelve a montar en cada navegación; la dirección
+   (izquierda/derecha) la decide según el orden de los accesos directos. */
+@keyframes nexor-page-in-right {
+  from {
+    opacity: 0;
+    transform: translate3d(36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes nexor-page-in-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes nexor-page-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Solo se anima el contenido marcado con `.nexor-page-anim` (nunca un
+   ancestro de elementos `position: fixed`, porque transform/filter crean un
+   bloque contenedor nuevo). `backwards` evita que el estado final quede
+   aplicado cuando termina la animación. */
+[data-nav="right"] .nexor-page-anim {
+  animation: nexor-page-in-right 0.46s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-nav="left"] .nexor-page-anim {
+  animation: nexor-page-in-left 0.46s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-nav="up"] .nexor-page-anim {
+  animation: nexor-page-in-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Elementos que aparecen en cascada dentro de una pantalla */
+@keyframes nexor-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nexor-rise {
+  animation: nexor-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Revelado al hacer scroll (la landing lo activa con IntersectionObserver) */
+.nexor-reveal {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+.nexor-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ───────────── Fondos animados infinitos por sección ───────────── */
+.nexor-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+.nexor-backdrop svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes nx-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -22px, 0) rotate(6deg);
+  }
+}
+@keyframes nx-drift {
+  0% {
+    transform: translate3d(-6%, 0, 0);
+  }
+  100% {
+    transform: translate3d(106%, 0, 0);
+  }
+}
+@keyframes nx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nx-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes nx-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes nx-flow {
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+@keyframes nx-scan {
+  0% {
+    transform: translate3d(0, -10%, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 110%, 0);
+    opacity: 0;
+  }
+}
+@keyframes nx-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes nx-rain {
+  from {
+    transform: translate3d(0, -20%, 0);
+  }
+  to {
+    transform: translate3d(0, 120%, 0);
+  }
+}
+
+.nx-float {
+  animation: nx-float 7s ease-in-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+.nx-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nx-spin 28s linear infinite;
+}
+.nx-spin-rev {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nx-spin-rev 36s linear infinite;
+}
+.nx-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nx-pulse 4.5s ease-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+.nx-flow {
+  stroke-dasharray: 6 10;
+  animation: nx-flow 2.4s linear infinite;
+}
+.nx-scan {
+  animation: nx-scan 6s ease-in-out infinite;
+}
+.nx-blink {
+  animation: nx-blink 3s ease-in-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+.nx-rain {
+  animation: nx-rain 9s linear infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+
+/* Cursor de botón con brillo que barre (landing) */
+@keyframes nexor-shine {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  60%,
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+.nexor-shine {
+  position: relative;
+  overflow: hidden;
+}
+.nexor-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: nexor-shine 3.6s ease-in-out infinite;
+}
+
+/* Marquee infinito (barra de confianza de la landing) */
+@keyframes nexor-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.nexor-marquee {
+  display: flex;
+  width: max-content;
+  animation: nexor-marquee 38s linear infinite;
+}
+
+/* Hojas modales: el fondo funde y la hoja sube con rebote suave */
+@keyframes nexor-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes nexor-sheet-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 40px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nexor-fade {
+  animation: nexor-fade-in 0.25s ease-out backwards;
+}
+.nexor-fade > * {
+  animation: nexor-sheet-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Anillo de cuenta atrás del código 2FA (maqueta de la landing) */
+@keyframes nx-countdown {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+.nx-countdown {
+  stroke-dasharray: 100;
+  animation: nx-countdown 30s linear infinite;
+}
+
+/* Tarjeta de la maqueta que flota suavemente */
+@keyframes nx-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+.nx-bob {
+  animation: nx-bob 6s ease-in-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+
+/* Preguntas frecuentes: el "+" gira al abrir */
+details.nexor-faq summary {
+  list-style: none;
+  cursor: pointer;
+}
+details.nexor-faq summary::-webkit-details-marker {
+  display: none;
+}
+details.nexor-faq .faq-plus {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+details.nexor-faq[open] .faq-plus {
+  transform: rotate(45deg);
+}
+details.nexor-faq[open] .faq-body {
+  animation: nexor-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Respeta a quien pide menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .nexor-reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+
+/* ───────────── Fluidez y rendimiento ───────────── */
+/* Evita el retardo de doble toque y el zoom accidental en controles */
+a,
+button,
+summary,
+[role="button"],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Las animaciones infinitas solo usan transform/opacity (se componen en la
+   GPU) y viven en su propia capa para no repintar el resto de la página. */
+.nexor-backdrop,
+.nx-bob,
+.nexor-marquee {
+  will-change: transform;
+}
+
+/* Secciones largas de la landing: el navegador no pinta lo que queda fuera de
+   pantalla hasta que se acerca (scroll más fluido, sobre todo en móvil). */
+.nexor-lazy-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}
+
+/* En pantallas pequeñas, fondos y cinta más ligeros */
+@media (max-width: 640px) {
+  .nexor-backdrop {
+    opacity: 0.85;
+  }
+  .nexor-marquee {
+    animation-duration: 28s;
+  }
+}
+@media (prefers-reduced-data: reduce) {
+  .nexor-backdrop {
+    display: none;
+  }
+}
+
+/* Tipografía fluida: escala con el ancho sin saltos entre dispositivos */
+.nexor-h1 {
+  font-size: clamp(2.15rem, 1.2rem + 4.6vw, 4rem);
+  line-height: 1.04;
+}
+.nexor-h2 {
+  font-size: clamp(1.75rem, 1.1rem + 2.6vw, 2.75rem);
+  line-height: 1.1;
 }

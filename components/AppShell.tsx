@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Lock, Share2, ShieldCheck, Users2, Settings2 } from 'lucide-react';
 import { NexorMark } from './NexorLogo';
 import PushSetup from './PushSetup';
+import { SectionBackdrop, type Scene } from './SectionBackdrop';
 
 const TABS = [
   { href: '/vault', label: 'Vault', icon: Lock },
@@ -15,12 +16,54 @@ const TABS = [
   { href: '/settings', label: 'Ajustes', icon: Settings2 },
 ];
 
+// Barra lateral de escritorio (lg+): sustituye a la barra inferior, con el
+// mismo orden de accesos directos y un indicador que se desliza entre ellos.
+function SideNav() {
+  const pathname = usePathname();
+  const activeIndex = TABS.findIndex(({ href }) => pathname === href || pathname?.startsWith(href + '/'));
+  return (
+    <aside className="safe-top fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-white/80 px-4 pb-6 pt-6 backdrop-blur-md lg:flex xl:w-64">
+      <Link href="/" className="mb-8 flex items-center gap-2.5 px-2">
+        <NexorMark size={26} id="side" />
+        <span className="text-[15px] font-black tracking-[0.18em] text-foreground">NEXOR</span>
+      </Link>
+      <nav className="relative flex flex-1 flex-col gap-1" aria-label="Secciones">
+        {activeIndex >= 0 && (
+          <span
+            aria-hidden
+            className="absolute left-0 right-0 h-11 rounded-xl bg-purple/12 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            style={{ transform: `translateY(${activeIndex * 48}px)` }}
+          />
+        )}
+        {TABS.map(({ href, label, icon: Icon }, i) => {
+          const active = i === activeIndex;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`relative z-10 flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] font-semibold transition-colors ${
+                active ? 'text-purple' : 'text-dim hover:text-foreground'
+              }`}
+            >
+              <Icon size={19} strokeWidth={active ? 2.4 : 1.9} />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+      <p className="px-2 text-[11px] leading-snug text-dim">Secure every connection</p>
+    </aside>
+  );
+}
+
 export function TopBar({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
   return (
     <header className="safe-top nexor-glass sticky top-0 z-30 border-b border-line">
-      <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
-        <div className="flex items-center gap-3 min-w-0">
-          <NexorMark size={22} id="topbar" />
+      <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-3.5 md:max-w-3xl lg:max-w-4xl lg:py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="lg:hidden">
+            <NexorMark size={22} id="topbar" />
+          </span>
           <div className="min-w-0">
             <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">{title}</h1>
             {subtitle && <p className="truncate text-[11px] text-dim">{subtitle}</p>}
@@ -129,7 +172,7 @@ export function BottomTabBar() {
       {/* filtro de refracción reutilizado por todos los iconos — solo se
           "activa" visualmente cuando la gota está encima (ver más abajo) */}
       <svg width="0" height="0" className="absolute" aria-hidden="true">
-        <filter id="nexor-glass-distortion" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+        <filter id="nexor-glass-distortion" x="-40%" y="-40%" width="180%" height="180%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.01 0.12" numOctaves="2" seed="7" result="noise" />
           <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" />
         </filter>
@@ -223,12 +266,32 @@ export function AppShell({
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname() ?? '';
+  const scene: Scene = pathname.startsWith('/share')
+    ? 'share'
+    : pathname.startsWith('/teams')
+      ? 'teams'
+      : pathname.startsWith('/audit')
+        ? 'audit'
+        : pathname.startsWith('/settings')
+          ? 'settings'
+          : 'vault';
+
   return (
-    <div className="nexor-mesh-bg flex min-h-screen flex-col bg-void">
+    <div className="nexor-mesh-bg relative flex min-h-dvh flex-col bg-void lg:pl-60 xl:pl-64">
+      <SideNav />
+      {/* fondo animado infinito que representa la sección actual */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] sm:h-[380px] lg:h-[440px]">
+        <SectionBackdrop scene={scene} key={scene} />
+      </div>
       <PushSetup />
       <TopBar title={title} subtitle={subtitle} right={right} />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-28 pt-5">{children}</main>
-      <BottomTabBar />
+      <main className="nexor-page-anim relative z-10 mx-auto w-full max-w-2xl flex-1 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-5 md:max-w-3xl lg:max-w-4xl lg:px-8 lg:pb-12 lg:pt-7">
+        {children}
+      </main>
+      <div className="lg:hidden">
+        <BottomTabBar />
+      </div>
     </div>
   );
 }

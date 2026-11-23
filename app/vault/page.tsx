@@ -34,7 +34,7 @@ import { useVaultStore } from '@/lib/store';
 import { matchBrandIcon } from '@/lib/brand-icon';
 import { collectDescendants, topDownOrder, type FolderNode } from '@/lib/folder-tree';
 import AutoLock from '@/components/AutoLock';
-import PasswordGenerator from '@/components/PasswordGenerator';
+import PasswordField from '@/components/PasswordField';
 import { AppShell } from '@/components/AppShell';
 import { BrandGlyph } from '@/components/BrandIcon';
 import { FolderPicker } from '@/components/FolderPicker';
@@ -790,13 +790,13 @@ export default function VaultPage() {
       <button
         onClick={openCreate}
         aria-label="Nuevo item"
-        className="fixed bottom-24 right-5 z-20 grid h-14 w-14 place-items-center rounded-full bg-purple text-white shadow-[0_10px_30px_-8px_rgba(108,92,231,0.8)] transition-transform active:scale-90"
+        className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-14 w-14 sm:right-6 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16 hover:scale-105 transition-transform place-items-center rounded-full bg-purple text-white shadow-[0_10px_30px_-8px_rgba(108,92,231,0.8)] transition-transform active:scale-90"
       >
         <Plus size={26} strokeWidth={2.4} />
       </button>
 
       {showForm && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6">
           <form
             onSubmit={onSave}
             className="safe-bottom max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[28px] border border-line bg-surface sm:rounded-[28px]"
@@ -848,16 +848,7 @@ export default function VaultPage() {
                 />
               </FormField>
 
-              <FormField icon={<ShieldCheck size={15} />} label="Contraseña">
-                <input
-                  placeholder="••••••••"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-transparent font-mono text-[14px] text-foreground outline-none placeholder:text-dim/50"
-                />
-              </FormField>
-
-              <PasswordGenerator onUse={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
+              <PasswordField value={form.password} onChange={(pwd) => setForm((f) => ({ ...f, password: pwd }))} />
 
               <TotpSecretInput value={form.totpSecret ?? ''} onChange={(secret) => setForm((f) => ({ ...f, totpSecret: secret }))} />
 
@@ -919,7 +910,7 @@ export default function VaultPage() {
       {/* hoja de acciones: renombrar / mover / eliminar carpeta */}
       {actionFolderId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => setActionFolderId(null)}
         >
           <div
@@ -964,7 +955,7 @@ export default function VaultPage() {
 
       {/* renombrar carpeta */}
       {renamingFolderId && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -994,7 +985,7 @@ export default function VaultPage() {
       {/* mover carpeta: a otra carpeta/raíz, o a un equipo entero */}
       {movingFolderId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => !moveToTeamBusy && setMovingFolderId(null)}
         >
           <div
@@ -1047,7 +1038,7 @@ export default function VaultPage() {
       {/* mover item del vault personal al vault de un equipo */}
       {movingItemId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => !moveToTeamBusy && setMovingItemId(null)}
         >
           <div
@@ -1084,7 +1075,7 @@ export default function VaultPage() {
       {/* mover item suelto a una carpeta del vault personal */}
       {movingItemFolderId && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => !movingItemFolderBusy && setMovingItemFolderId(null)}
         >
           <div
@@ -1113,7 +1104,7 @@ export default function VaultPage() {
       {/* ficha de detalle del item: se abre al tocar la tarjeta */}
       {viewItem && (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 sm:items-center sm:px-6"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/35 backdrop-blur-sm nexor-fade sm:items-center sm:px-6"
           onClick={() => setViewItemId(null)}
         >
           <div
@@ -1319,7 +1310,7 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl bg-surface-2 px-3 py-2 transition-colors focus-within:bg-line">
+    <div className="flex items-start gap-3 rounded-2xl border border-line-strong bg-white px-3.5 py-2.5 transition-all focus-within:border-purple focus-within:ring-4 focus-within:ring-purple/15">
       <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-dim">{icon}</div>
       <div className="min-w-0 flex-1">
         <label className="block text-[10.5px] font-semibold uppercase tracking-wide text-dim">{label}</label>
