@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { deriveAuthKey, deriveMasterKey, deriveVaultKey, hashAuthKey } from '@/lib/crypto';
 import { useVaultStore } from '@/lib/store';
+import { safeNext } from '@/lib/safe-next';
 import { AuthCard, inputClass, primaryButtonClass } from '@/components/AuthCard';
 import { Lock } from 'lucide-react';
+
+// Tras autenticarse vuelve a donde iba (p. ej. /open al compartir una web a Nexor).
+function afterAuthPath(): string {
+  return safeNext(new URLSearchParams(window.location.search).get('next')) ?? '/vault';
+}
 
 export default function UnlockPage() {
   const router = useRouter();
@@ -48,7 +54,7 @@ export default function UnlockPage() {
       if (!res.ok) throw new Error('Master password incorrecto');
 
       setUnlocked(email, vaultKey);
-      router.push('/vault');
+      router.push(afterAuthPath());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {

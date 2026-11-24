@@ -49,3 +49,7 @@ next-env.d.ts
 .vercel
 .env*
 easypanel-vapid-vars.txt
+
+# build de la extensión de navegador (npm run ext:build)
+/extension/dist/
+/public/downloads/

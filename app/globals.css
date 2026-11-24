@@ -23,7 +23,23 @@
 
   --background: var(--nexor-void);
   --foreground: var(--nexor-text);
+
+  /* color de la sección actual (por defecto, el violeta de marca) */
+  --nx-accent: #6c5ce7;
+  --nx-accent-2: #38bdf8;
 }
+
+/* Cada sección tiene su pareja de colores: la principal tiñe fondo, destello y
+   pestaña; la secundaria se mezcla en las capas animadas. */
+[data-section="vault"] { --nx-accent: #6c5ce7; --nx-accent-2: #38bdf8; }
+[data-section="share"] { --nx-accent: #0ea5e9; --nx-accent-2: #6366f1; }
+[data-section="teams"] { --nx-accent: #ec4899; --nx-accent-2: #f97316; }
+[data-section="audit"] { --nx-accent: #10b981; --nx-accent-2: #14b8a6; }
+[data-section="settings"] { --nx-accent: #f59e0b; --nx-accent-2: #ef4444; }
+[data-section="import"] { --nx-accent: #14b8a6; --nx-accent-2: #6c5ce7; }
+[data-section="open"] { --nx-accent: #6366f1; --nx-accent-2: #ec4899; }
+[data-section="extension"] { --nx-accent: #8b5cf6; --nx-accent-2: #0ea5e9; }
+[data-section="home"] { --nx-accent: #6c5ce7; --nx-accent-2: #ec4899; }
 
 @theme inline {
   --color-background: var(--background);
@@ -95,9 +111,35 @@ body {
 /* Fondo con textura de red — eco del patrón de marca (nodos + líneas) */
 .nexor-mesh-bg {
   background-image:
-    radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.1), transparent 42%),
-    radial-gradient(circle at 85% 0%, rgba(139, 124, 246, 0.09), transparent 46%),
-    radial-gradient(circle at 50% 100%, rgba(108, 92, 231, 0.06), transparent 52%);
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--nx-accent) 16%, transparent), transparent 44%),
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--nx-accent-2) 15%, transparent), transparent 48%),
+    radial-gradient(circle at 50% 104%, color-mix(in srgb, var(--nx-accent) 11%, transparent), transparent 55%);
+}
+
+/* Destello de color al entrar en una sección: se ve el cambio aunque el resto sea blanco. */
+@keyframes nexor-wash {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+.nexor-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  background:
+    radial-gradient(110% 75% at 50% 108%, color-mix(in srgb, var(--nx-accent) 42%, transparent), transparent 62%),
+    radial-gradient(85% 55% at 0% 0%, color-mix(in srgb, var(--nx-accent-2) 30%, transparent), transparent 60%),
+    radial-gradient(70% 50% at 100% 20%, color-mix(in srgb, var(--nx-accent) 22%, transparent), transparent 60%);
+  animation: nexor-wash 0.95s ease-out both;
 }
 
 .nexor-glass {
@@ -120,7 +162,9 @@ body {
 
 /* Píldora activa que se desliza entre pestañas con rebote elástico. */
 .nexor-active-pill {
-  transition: left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.45s ease;
 }
 
 /* Gota de vidrio que sigue al dedo y se "funde" con la pestaña de debajo. */
@@ -270,8 +314,14 @@ body {
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
+  color: var(--nx-accent, #6c5ce7);
   container-type: size;
   contain: layout paint style;
+}
+/* capas alternas en el segundo color de la sección: más variedad, mismo coste */
+.nexor-backdrop > .nx-l:nth-child(3n + 2),
+.nexor-backdrop > .nx-l:nth-child(5n + 4) {
+  color: var(--nx-accent-2, #38bdf8);
 }
 /* fundido inferior con un degradado (más barato que una máscara) */
 .nexor-backdrop::after {

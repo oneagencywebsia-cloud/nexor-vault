@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { deriveAuthKey, deriveMasterKey, deriveVaultKey, hashAuthKey } from '@/lib/crypto';
 import { useVaultStore } from '@/lib/store';
+import { safeNext } from '@/lib/safe-next';
 import { AuthCard, ghostButtonClass, inputClass, primaryButtonClass } from '@/components/AuthCard';
+
+// Tras autenticarse vuelve a donde iba (p. ej. /open al compartir una web a Nexor).
+function afterAuthPath(): string {
+  return safeNext(new URLSearchParams(window.location.search).get('next')) ?? '/vault';
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,7 +56,7 @@ export default function LoginPage() {
       }
 
       setUnlocked(normalizedEmail, vaultKey);
-      router.push('/vault');
+      router.push(afterAuthPath());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
@@ -73,7 +79,7 @@ export default function LoginPage() {
       if (!res.ok) throw new Error(data.error || 'Código incorrecto');
 
       setUnlocked(pendingEmail, pendingVaultKey);
-      router.push('/vault');
+      router.push(afterAuthPath());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {

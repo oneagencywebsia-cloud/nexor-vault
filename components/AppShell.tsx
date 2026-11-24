@@ -8,13 +8,35 @@ import { NexorMark } from './NexorLogo';
 import PushSetup from './PushSetup';
 import { SectionBackdrop, type Scene } from './SectionBackdrop';
 
+// Cada sección tiene su color (el violeta de marca es el de Vault): así se nota
+// al cambiar de pantalla. Los mismos colores están en globals.css ([data-section]).
 const TABS = [
-  { href: '/vault', label: 'Vault', icon: Lock },
-  { href: '/share', label: 'Compartir', icon: Share2 },
-  { href: '/teams', label: 'Equipos', icon: Users2 },
-  { href: '/audit', label: 'Auditoría', icon: ShieldCheck },
-  { href: '/settings', label: 'Ajustes', icon: Settings2 },
+  { href: '/vault', label: 'Vault', icon: Lock, color: '#6c5ce7' },
+  { href: '/share', label: 'Compartir', icon: Share2, color: '#0ea5e9' },
+  { href: '/teams', label: 'Equipos', icon: Users2, color: '#ec4899' },
+  { href: '/audit', label: 'Auditoría', icon: ShieldCheck, color: '#10b981' },
+  { href: '/settings', label: 'Ajustes', icon: Settings2, color: '#f59e0b' },
 ];
+
+function sectionOf(pathname: string): string {
+  const tab = TABS.find(({ href }) => pathname === href || pathname.startsWith(href + '/'));
+  if (tab) return tab.href.slice(1);
+  if (pathname.startsWith('/import')) return 'import';
+  if (pathname.startsWith('/open')) return 'open';
+  if (pathname.startsWith('/extension')) return 'extension';
+  return 'vault';
+}
+
+const SCENE_BY_SECTION: Record<string, Scene> = {
+  vault: 'vault',
+  share: 'share',
+  teams: 'teams',
+  audit: 'audit',
+  settings: 'settings',
+  import: 'share',
+  open: 'vault',
+  extension: 'settings',
+};
 
 // Barra lateral de escritorio (lg+): sustituye a la barra inferior, con el
 // mismo orden de accesos directos y un indicador que se desliza entre ellos.
@@ -31,18 +53,22 @@ function SideNav() {
         {activeIndex >= 0 && (
           <span
             aria-hidden
-            className="absolute left-0 right-0 h-11 rounded-xl bg-purple/12 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-            style={{ transform: `translateY(${activeIndex * 48}px)` }}
+            className="absolute left-0 right-0 h-11 rounded-xl transition-[transform,background-color] duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+            style={{
+              transform: `translateY(${activeIndex * 48}px)`,
+              backgroundColor: `color-mix(in srgb, ${TABS[activeIndex].color} 14%, transparent)`,
+            }}
           />
         )}
-        {TABS.map(({ href, label, icon: Icon }, i) => {
+        {TABS.map(({ href, label, icon: Icon, color }, i) => {
           const active = i === activeIndex;
           return (
             <Link
               key={href}
               href={href}
+              style={active ? { color } : undefined}
               className={`relative z-10 flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] font-semibold transition-colors ${
-                active ? 'text-purple' : 'text-dim hover:text-foreground'
+                active ? '' : 'text-dim hover:text-foreground'
               }`}
             >
               <Icon size={19} strokeWidth={active ? 2.4 : 1.9} />
@@ -203,16 +229,18 @@ export function BottomTabBar() {
 
         {/* píldora activa, se desliza entre pestañas con rebote */}
         <div
-          className="nexor-active-pill absolute inset-y-1.5 rounded-[19px] bg-purple/20"
+          className="nexor-active-pill absolute inset-y-1.5 rounded-[19px]"
           style={{
             width: `calc(${pillPercent}% - 6px)`,
             left: `calc(${activeIndex * pillPercent}% + 3px)`,
+            backgroundColor: `color-mix(in srgb, ${TABS[activeIndex].color} 20%, transparent)`,
           }}
         />
 
-        {TABS.map(({ href, label, icon: Icon }, i) => {
+        {TABS.map(({ href, label, icon: Icon, color }, i) => {
           const active = pathname === href || pathname?.startsWith(href + '/');
           const distorted = hoveredIndex === i;
+          const tint = active ? { color } : undefined;
           return (
             <Link
               key={href}
@@ -229,22 +257,23 @@ export function BottomTabBar() {
                 <Icon
                   size={22}
                   strokeWidth={active ? 2.4 : 1.8}
-                  className={`transition-opacity duration-200 ${active ? 'text-purple' : 'text-dim'} ${
+                  className={`transition-opacity duration-200 ${active ? '' : 'text-dim'} ${
                     distorted ? 'opacity-0' : 'opacity-100'
                   }`}
+                  style={tint}
                 />
                 {/* copia distorsionada, se funde con la de arriba solo
                     mientras la gota de vidrio pasa por este icono */}
                 <Icon
                   size={22}
                   strokeWidth={active ? 2.4 : 1.8}
-                  className={`absolute inset-0 transition-opacity duration-200 ${active ? 'text-purple' : 'text-dim'} ${
+                  className={`absolute inset-0 transition-opacity duration-200 ${active ? '' : 'text-dim'} ${
                     distorted ? 'opacity-100' : 'opacity-0'
                   }`}
-                  style={{ filter: 'url(#nexor-glass-distortion)' }}
+                  style={{ filter: 'url(#nexor-glass-distortion)', ...tint }}
                 />
               </span>
-              <span className={`text-[10px] font-medium transition-colors ${active ? 'text-purple' : 'text-dim'}`}>
+              <span className={`text-[10px] font-medium transition-colors ${active ? '' : 'text-dim'}`} style={tint}>
                 {label}
               </span>
             </Link>
@@ -267,28 +296,26 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? '';
-  const scene: Scene = pathname.startsWith('/share')
-    ? 'share'
-    : pathname.startsWith('/teams')
-      ? 'teams'
-      : pathname.startsWith('/audit')
-        ? 'audit'
-        : pathname.startsWith('/settings')
-          ? 'settings'
-          : 'vault';
+  const section = sectionOf(pathname);
+  const scene = SCENE_BY_SECTION[section] ?? 'vault';
 
   return (
-    <div className="nexor-mesh-bg relative flex min-h-dvh flex-col bg-void lg:pl-60 xl:pl-64">
+    <div data-section={section} className="nexor-mesh-bg relative flex min-h-dvh flex-col bg-void lg:pl-60 xl:pl-64">
       <SideNav />
-      {/* fondo animado infinito que representa la sección actual */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] sm:h-[380px] lg:h-[440px]">
-        <SectionBackdrop scene={scene} key={scene} className="opacity-60" />
+      {/* destello de color de la sección al entrar: es lo que hace visible la transición */}
+      <div aria-hidden className="nexor-wash" />
+      {/* fondo animado infinito que representa la sección actual: ocupa toda la
+          pantalla, fijo detrás del contenido (no se corta ni se mueve al hacer scroll) */}
+      <div className="pointer-events-none fixed inset-0 z-0 lg:left-60 xl:left-64">
+        <SectionBackdrop scene={scene} key={scene} fade="transparent" className="opacity-45" />
       </div>
       <PushSetup />
       <TopBar title={title} subtitle={subtitle} right={right} />
       <main className="nexor-page-anim relative z-10 mx-auto w-full max-w-2xl flex-1 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-5 md:max-w-3xl lg:max-w-4xl lg:px-8 lg:pb-12 lg:pt-7">
         {children}
       </main>
+      {/* el contenido se funde con el fondo antes de llegar a la barra inferior */}
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-40 bg-gradient-to-t from-white via-white/75 to-transparent lg:hidden" />
       <div className="lg:hidden">
         <BottomTabBar />
       </div>

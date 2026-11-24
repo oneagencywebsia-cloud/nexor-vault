@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, ShieldCheck, Mail, Upload } from 'lucide-react';
+import { ChevronRight, ShieldCheck, Mail, Puzzle, Upload } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
@@ -207,6 +207,16 @@ export default function SettingsPage() {
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold text-foreground">Importar contraseñas</p>
             <p className="text-[12px] text-dim">Desde Bitwarden, Chrome, 1Password, LastPass…</p>
+          </div>
+          <ChevronRight size={18} className="shrink-0 text-dim" />
+        </Link>
+        <Link href="/extension" className="flex w-full items-center gap-3 border-t border-line p-4 text-left active:bg-surface-2">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-purple/15 text-purple">
+            <Puzzle size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-foreground">Extensión de navegador</p>
+            <p className="text-[12px] text-dim">Rellena en un clic en Chrome, Edge, Brave y Firefox</p>
           </div>
           <ChevronRight size={18} className="shrink-0 text-dim" />
         </Link>

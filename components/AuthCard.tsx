@@ -11,9 +11,9 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="nexor-mesh-bg safe-top safe-bottom relative flex min-h-dvh flex-1 items-center justify-center overflow-hidden bg-void px-4 py-8 sm:px-6 sm:py-10">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[360px]">
-        <SectionBackdrop scene="home" />
+    <div data-section="home" className="nexor-mesh-bg safe-top safe-bottom relative flex min-h-dvh flex-1 items-center justify-center overflow-hidden bg-void px-4 py-8 sm:px-6 sm:py-10">
+      <div className="pointer-events-none absolute inset-0">
+        <SectionBackdrop scene="home" fade="transparent" className="opacity-70" />
       </div>
       <div className="nexor-page-anim relative z-10 w-full max-w-sm rounded-[28px] sm:border sm:border-line sm:bg-white/80 sm:p-8 sm:shadow-[0_30px_70px_-35px_rgba(76,63,196,0.4)] sm:backdrop-blur-md">
         <div className="mb-7 flex flex-col items-center text-center sm:mb-8">

@@ -385,7 +385,7 @@ export function SectionBackdrop({ scene, className = '', fade }: { scene: Scene;
     <div
       ref={ref}
       aria-hidden
-      className={`nexor-backdrop text-purple ${active ? '' : 'nx-paused'} ${lite ? 'nx-lite' : ''} ${className}`}
+      className={`nexor-backdrop ${active ? '' : 'nx-paused'} ${lite ? 'nx-lite' : ''} ${className}`}
       style={fade ? ({ '--nx-fade': fade } as Vars) : undefined}
     >
       <Scn />

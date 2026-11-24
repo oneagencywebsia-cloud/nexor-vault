@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // generados: bundles de la extensión y sus zips (npm run ext:build)
+    "extension/dist/**",
+    "public/downloads/**",
   ]),
 ]);
 

@@ -5,11 +5,14 @@
   "scripts": {
     "predev": "node scripts/generate-brand-icons.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/generate-brand-icons.mjs",
+    "prebuild": "node scripts/generate-brand-icons.mjs && node extension/build.mjs --publish",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ext:build": "node extension/build.mjs",
+    "ext:zip": "node extension/build.mjs --zip",
+    "ext:check": "tsc -p extension/tsconfig.json --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -29,13 +32,16 @@
   "devDependencies": {
     "@fortawesome/free-brands-svg-icons": "^7.3.1",
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.3.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "@types/web-push": "^3.6.4",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "fflate": "^0.8.3",
     "sharp": "^0.35.3",
     "simple-icons": "^16.28.0",
     "tailwindcss": "^4",

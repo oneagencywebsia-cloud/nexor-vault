@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'nexor-shell-v1';
+const SHELL_CACHE = 'nexor-shell-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(['/manifest.webmanifest'])));
@@ -17,7 +17,8 @@ self.addEventListener('activate', (event) => {
 // auto-lock y podría servir datos de sesión obsoletos.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
+  // /open recibe la URL que el usuario comparte: no se cachea (privacidad).
+  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') || url.pathname.startsWith('/open')) return;
 
   event.respondWith(
     fetch(event.request)

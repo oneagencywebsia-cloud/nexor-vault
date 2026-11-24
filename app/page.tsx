@@ -23,25 +23,30 @@ import { SectionBackdrop, type Scene } from '@/components/SectionBackdrop';
 const PROBLEMS = [
   {
     icon: MessageCircleWarning,
+    color: '#e11d48',
     title: 'Accesos por WhatsApp',
     desc: 'Contraseñas en chats, notas y hojas de cálculo que nadie controla ni puede revocar.',
   },
   {
     icon: UserMinus,
+    color: '#f59e0b',
     title: 'Alguien se marcha',
     desc: 'Cuando una persona deja el equipo, ¿sabes a qué cuentas tenía acceso y cuáles debes cambiar?',
   },
   {
     icon: KeyRound,
+    color: '#0ea5e9',
     title: 'Todo depende de una persona',
     desc: 'Si solo una persona recuerda dónde está cada acceso, tu negocio tiene un punto único de fallo.',
   },
 ];
 
-const STEPS: { icon: typeof Lock; scene: Scene; title: string; desc: string; points: string[] }[] = [
+const STEPS: { icon: typeof Lock; scene: Scene; accent: string; accent2: string; title: string; desc: string; points: string[] }[] = [
   {
     icon: Lock,
     scene: 'vault',
+    accent: '#6c5ce7',
+    accent2: '#38bdf8',
     title: 'Guarda y organiza',
     desc: 'Una bóveda cifrada para todos tus accesos, con carpetas y el logo de cada marca.',
     points: ['Carpetas anidadas', 'Generador de contraseñas', 'Códigos 2FA en vivo por acceso'],
@@ -49,6 +54,8 @@ const STEPS: { icon: typeof Lock; scene: Scene; title: string; desc: string; poi
   {
     icon: Share2,
     scene: 'share',
+    accent: '#0ea5e9',
+    accent2: '#6366f1',
     title: 'Comparte sin exponer',
     desc: 'Envía un acceso a quien lo necesite sin pegar la contraseña en ningún chat.',
     points: ['Compartir un acceso concreto', 'Vaults de equipo con carpetas', 'Avisos al añadir contenido'],
@@ -56,6 +63,8 @@ const STEPS: { icon: typeof Lock; scene: Scene; title: string; desc: string; poi
   {
     icon: ScrollText,
     scene: 'audit',
+    accent: '#10b981',
+    accent2: '#14b8a6',
     title: 'Controla y revisa',
     desc: 'Detecta contraseñas débiles o repetidas y consulta qué ha pasado en tu cuenta.',
     points: ['Auditoría de contraseñas', 'Registro de actividad', 'Bloqueo automático por inactividad'],
@@ -63,9 +72,9 @@ const STEPS: { icon: typeof Lock; scene: Scene; title: string; desc: string; poi
 ];
 
 const USES = [
-  { icon: Laptop, title: 'Agencias', desc: 'Redes, hosting, anuncios y herramientas de cada cliente, ordenados por carpetas.' },
-  { icon: Smartphone, title: 'Autónomos', desc: 'Todos tus accesos con 2FA integrado, en el móvil y en el ordenador.' },
-  { icon: Users2, title: 'Equipos remotos', desc: 'Un vault compartido por equipo, sin depender de quién tiene qué contraseña.' },
+  { icon: Laptop, color: '#6c5ce7', title: 'Agencias', desc: 'Redes, hosting, anuncios y herramientas de cada cliente, ordenados por carpetas.' },
+  { icon: Smartphone, color: '#0ea5e9', title: 'Autónomos', desc: 'Todos tus accesos con 2FA integrado, en el móvil y en el ordenador.' },
+  { icon: Users2, color: '#ec4899', title: 'Equipos remotos', desc: 'Un vault compartido por equipo, sin depender de quién tiene qué contraseña.' },
 ];
 
 const FAQ = [
@@ -95,7 +104,7 @@ const MARQUEE = ['Redes sociales', 'Hosting y dominios', 'Banca', 'Facturación'
 
 export default function Home() {
   return (
-    <div className="relative flex flex-1 flex-col overflow-x-clip bg-void text-foreground">
+    <div data-section="home" className="relative flex flex-1 flex-col overflow-x-clip bg-void text-foreground">
       {/* ───────── Navegación ───────── */}
       <header className="safe-top nexor-glass sticky top-0 z-40 border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3">
@@ -138,7 +147,7 @@ export default function Home() {
             <Reveal index={1}>
               <h1 className="mt-5 nexor-h1 font-black tracking-tight">
                 Tu equipo comparte accesos.{' '}
-                <span className="bg-gradient-to-r from-purple to-purple-bright bg-clip-text text-transparent">No riesgos.</span>
+                <span className="bg-gradient-to-r from-[#6c5ce7] via-[#0ea5e9] to-[#ec4899] bg-clip-text text-transparent">No riesgos.</span>
               </h1>
             </Reveal>
             <Reveal index={2}>
@@ -255,7 +264,7 @@ export default function Home() {
       </div>
 
       {/* ───────── Problema ───────── */}
-      <section id="problema" className="nexor-lazy-section relative scroll-mt-16 py-14 sm:py-20 md:py-28">
+      <section id="problema" className="nexor-lazy-section relative scroll-mt-16 bg-gradient-to-b from-white via-white to-rose-50/50 py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
             <p className="text-[12px] font-black uppercase tracking-[0.2em] text-purple">El problema</p>
@@ -264,10 +273,13 @@ export default function Home() {
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {PROBLEMS.map(({ icon: Icon, title, desc }, i) => (
+            {PROBLEMS.map(({ icon: Icon, title, desc, color }, i) => (
               <Reveal key={title} index={i}>
                 <div className="group h-full rounded-3xl border border-line bg-surface p-7 transition-all duration-300 hover:-translate-y-1.5 hover:border-purple/40 hover:bg-white hover:shadow-[0_24px_50px_-24px_rgba(76,63,196,0.45)]">
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-danger/10 text-danger transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110">
+                  <span
+                    className="grid h-12 w-12 place-items-center rounded-2xl transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110"
+                    style={{ background: color + '1f', color }}
+                  >
                     <Icon size={22} />
                   </span>
                   <h3 className="mt-5 text-[19px] font-black">{title}</h3>
@@ -280,7 +292,7 @@ export default function Home() {
       </section>
 
       {/* ───────── Cómo funciona (cada paso con su fondo animado) ───────── */}
-      <section id="como" className="nexor-lazy-section relative scroll-mt-16 bg-surface py-14 sm:py-20 md:py-28">
+      <section id="como" className="nexor-lazy-section relative scroll-mt-16 bg-gradient-to-b from-rose-50/50 via-surface to-sky-50/60 py-14 sm:py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
             <p className="text-[12px] font-black uppercase tracking-[0.2em] text-purple">Cómo funciona</p>
@@ -289,17 +301,22 @@ export default function Home() {
             </h2>
           </Reveal>
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            {STEPS.map(({ icon: Icon, scene, title, desc, points }, i) => (
+            {STEPS.map(({ icon: Icon, scene, accent, accent2, title, desc, points }, i) => (
               <Reveal key={title} index={i}>
-                <article className="group relative h-full overflow-hidden rounded-3xl border border-line bg-white p-7 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_28px_60px_-28px_rgba(76,63,196,0.5)]">
+                <article
+                  className="group relative h-full overflow-hidden rounded-3xl border border-line bg-white p-7 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_28px_60px_-28px_var(--nx-accent)]"
+                  style={{ ['--nx-accent' as string]: accent, ['--nx-accent-2' as string]: accent2 }}
+                >
                   <div className="absolute inset-x-0 top-0 h-48 opacity-70 transition-opacity duration-500 group-hover:opacity-100">
                     <SectionBackdrop scene={scene} />
                   </div>
                   <div className="relative z-10 pt-24">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-purple text-white shadow-[0_10px_24px_-10px_rgba(108,92,231,0.9)]">
+                    <span className="grid h-12 w-12 place-items-center rounded-2xl text-white shadow-[0_10px_24px_-10px_var(--nx-accent)]" style={{ background: accent }}>
                       <Icon size={22} />
                     </span>
-                    <p className="mt-5 text-[12px] font-black uppercase tracking-widest text-purple">Paso {i + 1}</p>
+                    <p className="mt-5 text-[12px] font-black uppercase tracking-widest" style={{ color: accent }}>
+                      Paso {i + 1}
+                    </p>
                     <h3 className="mt-1 text-[22px] font-black">{title}</h3>
                     <p className="mt-2 text-[15px] leading-relaxed text-dim">{desc}</p>
                     <ul className="mt-5 space-y-2">
@@ -318,7 +335,7 @@ export default function Home() {
       </section>
 
       {/* ───────── Seguridad ───────── */}
-      <section id="seguridad" className="nexor-lazy-section relative scroll-mt-16 py-14 sm:py-20 md:py-28">
+      <section id="seguridad" className="nexor-lazy-section relative scroll-mt-16 bg-gradient-to-b from-sky-50/60 via-white to-white py-14 sm:py-20 md:py-28">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-2">
           <Reveal>
             <p className="text-[12px] font-black uppercase tracking-[0.2em] text-purple">Seguridad</p>
@@ -388,7 +405,7 @@ export default function Home() {
       </section>
 
       {/* ───────── Casos de uso ───────── */}
-      <section className="relative bg-surface py-14 sm:py-20 md:py-24">
+      <section className="relative bg-gradient-to-b from-white via-surface to-fuchsia-50/50 py-14 sm:py-20 md:py-24">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
             <p className="text-[12px] font-black uppercase tracking-[0.2em] text-purple">Para quién es</p>
@@ -397,10 +414,13 @@ export default function Home() {
             </h2>
           </Reveal>
           <div className="mt-10 grid gap-5 md:grid-cols-3">
-            {USES.map(({ icon: Icon, title, desc }, i) => (
+            {USES.map(({ icon: Icon, title, desc, color }, i) => (
               <Reveal key={title} index={i}>
                 <div className="group flex h-full gap-4 rounded-3xl border border-line bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:border-purple/40">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-purple/10 text-purple transition-colors group-hover:bg-purple group-hover:text-white">
+                  <span
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[color-mix(in_srgb,var(--c)_12%,transparent)] text-[var(--c)] transition-colors group-hover:bg-[var(--c)] group-hover:text-white"
+                    style={{ ['--c' as string]: color }}
+                  >
                     <Icon size={22} />
                   </span>
                   <div>
