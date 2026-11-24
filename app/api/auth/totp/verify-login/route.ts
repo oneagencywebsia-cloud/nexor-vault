@@ -36,6 +36,6 @@ export async function POST(req: NextRequest) {
 
   await clearAttempts(rateLimitId);
 
-  const token = await createSessionCookie(pending);
+  const token = await createSessionCookie(pending, { extension: body.client === 'extension' });
   return NextResponse.json({ ok: true, userId: pending.userId, email: pending.email, token });
 }

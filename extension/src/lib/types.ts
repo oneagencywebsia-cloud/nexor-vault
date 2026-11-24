@@ -26,7 +26,15 @@ export type Request =
   | { type: 'status' }
   | { type: 'unlock'; serverUrl: string; email: string; password: string }
   | { type: 'unlock-totp'; code: string }
+  /** Desbloqueo local de una cuenta ya recordada: solo la master password. */
+  | { type: 'unlock-local'; password: string }
   | { type: 'lock' }
+  /** Cierra la sesión: olvida la cuenta, el token y el desbloqueo biométrico. */
+  | { type: 'logout' }
+  | { type: 'bio-info' }
+  | { type: 'bio-enroll'; rpId: string; credId: string; prfSalt: string; prfOutput: string }
+  | { type: 'bio-unlock'; prfOutput: string }
+  | { type: 'bio-remove' }
   | { type: 'items'; pageUrl: string }
   | { type: 'secret'; id: string; field: 'username' | 'password' | 'totp' }
   | { type: 'fill'; id: string; tabId: number; allowRelated?: boolean };
@@ -37,6 +45,10 @@ export type Response =
 
 export interface Status {
   unlocked: boolean;
+  /** Hay una cuenta recordada en este navegador (no hace falta volver a iniciar sesión). */
+  hasAccount: boolean;
+  /** El desbloqueo con huella/Face ID/llave está activado. */
+  bioEnrolled: boolean;
   email: string | null;
   serverUrl: string;
   pendingTotp: boolean;

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, ShieldCheck, Mail, Puzzle, Upload } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { BiometricSetup } from '@/components/BiometricSetup';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
 type Step = 'loading' | 'idle' | 'setup' | 'disable';
@@ -197,6 +198,8 @@ export default function SettingsPage() {
           </form>
         )}
       </div>
+
+      <BiometricSetup email={email} />
 
       <p className="mb-2 mt-6 px-1 text-[12px] font-semibold uppercase tracking-wide text-dim">Datos</p>
       <div className="overflow-hidden rounded-2xl border border-line bg-surface/70">

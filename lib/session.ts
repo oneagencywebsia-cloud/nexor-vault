@@ -5,6 +5,9 @@ import type { NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'kc_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12h — solo autentica la API, no da acceso a la vault key
+// La extensión de navegador guarda su sesión entre reinicios del navegador (la vault key NO: se desbloquea
+// con master password o con huella/Face ID/llave), así que su token dura más para no pedir login completo.
+const EXTENSION_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 días
 const PENDING_TOTP_TTL_SECONDS = 5 * 60; // 5 min para completar el 2FA
 
 function getSecret(): Uint8Array {
@@ -18,11 +21,11 @@ export interface SessionPayload {
   email: string;
 }
 
-async function signSessionToken(payload: SessionPayload): Promise<string> {
+async function signSessionToken(payload: SessionPayload, ttlSeconds: number): Promise<string> {
   return new SignJWT({ ...payload, purpose: 'session' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .setExpirationTime(`${ttlSeconds}s`)
     .sign(getSecret());
 }
 
@@ -42,8 +45,11 @@ async function verifySessionToken(token: string): Promise<SessionPayload | null>
  * extensión de navegador, que no puede depender de la cookie (SameSite=lax
  * bloquea el envío de cookies en fetch cross-site desde chrome-extension://).
  */
-export async function createSessionCookie(payload: SessionPayload): Promise<string> {
-  const token = await signSessionToken(payload);
+export async function createSessionCookie(payload: SessionPayload, opts: { extension?: boolean } = {}): Promise<string> {
+  // Extensión: token de larga duración y SIN cookie (usa Authorization: Bearer).
+  if (opts.extension) return signSessionToken(payload, EXTENSION_TTL_SECONDS);
+
+  const token = await signSessionToken(payload, SESSION_TTL_SECONDS);
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,

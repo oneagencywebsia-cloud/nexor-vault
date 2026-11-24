@@ -1,6 +1,10 @@
 @import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap");
 @import "tailwindcss";
 
+/* Diseño de ordenador (barra lateral): solo con pantalla ancha Y ratón. Un móvil o tableta con
+   "versión de escritorio" activada sigue viendo el diseño móvil, que es el que funciona con el dedo. */
+@custom-variant desk (@media (min-width: 64rem) and (pointer: fine));
+
 :root {
   /* Paleta Nexor — tema claro: fondo blanco como las marcas de confianza,
      el violeta de marca queda como único color de acción. */

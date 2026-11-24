@@ -2,6 +2,7 @@
 // (nunca innerHTML con datos), y solo recibe del service worker datos que no son
 // secretos: la contraseña y el 2FA se piden uno a uno, por acción del usuario.
 
+import { BIO_MESSAGES, BioError, bioSupported, createBioCredential, getBioPrf, toB64 } from '@/lib/biometric';
 import { DEFAULT_SERVER, type ItemSummary, type Request, type Response, type Status } from '../lib/types';
 import { normalizeServerUrl } from '../lib/state';
 
@@ -80,14 +81,32 @@ function header(status?: Status): HTMLElement {
   return h('header', {}, logo, h('span', { class: 'brand' }, 'NEXOR'), right);
 }
 
-// ───────────── vista: bloqueado ─────────────
+// ───────────── biometría: ventana propia ─────────────
+// La verificación (huella, Face ID, llave) se hace en una ventana aparte y no en el
+// popup: en varios navegadores el popup se cierra cuando aparece el aviso del sistema
+// (Windows Hello, Touch ID…) y se perdería la verificación a medias.
 
-function lockedView(status: Status): HTMLElement {
+async function openBioWindow(mode: 'enroll' | 'unlock'): Promise<void> {
+  await chrome.windows.create({ url: chrome.runtime.getURL(`popup.html?bio=${mode}`), type: 'popup', width: 420, height: 500, focused: true });
+  window.close();
+}
+
+function bioButton(): HTMLElement {
+  return h(
+    'button',
+    { class: 'btn secondary', type: 'button', onclick: () => openBioWindow('unlock') },
+    'Desbloquear con huella, Face ID o llave',
+  );
+}
+
+// ───────────── vista: iniciar sesión (primera vez) ─────────────
+
+function loginView(status: Status): HTMLElement {
   const email = h('input', { type: 'email', required: true, autocomplete: 'username', placeholder: 'tu@email.com', value: status.email ?? '' });
   const password = h('input', { type: 'password', required: true, autocomplete: 'current-password', placeholder: 'Master password' });
   const server = h('input', { type: 'url', value: status.serverUrl || DEFAULT_SERVER, placeholder: DEFAULT_SERVER });
   const error = h('p', { class: 'error', hidden: true });
-  const submit = h('button', { class: 'btn', type: 'submit' }, 'Desbloquear');
+  const submit = h('button', { class: 'btn', type: 'submit' }, 'Iniciar sesión');
   // Solo las compilaciones para instalaciones propias (--custom-server) permiten otro servidor.
   const canCustomServer = !!chrome.runtime.getManifest().optional_host_permissions?.length;
 
@@ -98,7 +117,7 @@ function lockedView(status: Status): HTMLElement {
         e.preventDefault();
         error.hidden = true;
         submit.disabled = true;
-        submit.textContent = 'Desbloqueando…';
+        submit.textContent = 'Iniciando sesión…';
         try {
           // El permiso para un servidor propio debe pedirse dentro del gesto del usuario.
           const origin = normalizeServerUrl(server.value);
@@ -113,7 +132,7 @@ function lockedView(status: Status): HTMLElement {
           error.textContent = err instanceof Error ? err.message : 'Error inesperado';
           error.hidden = false;
           submit.disabled = false;
-          submit.textContent = 'Desbloquear';
+          submit.textContent = 'Iniciar sesión';
         }
       },
     },
@@ -129,10 +148,142 @@ function lockedView(status: Status): HTMLElement {
   return h(
     'main',
     {},
-    h('h1', {}, 'Desbloquea tu bóveda'),
-    h('p', { class: 'sub' }, 'Tu master password se usa solo en este navegador; nunca se envía.'),
+    h('h1', {}, 'Inicia sesión'),
+    h('p', { class: 'sub' }, 'Solo la primera vez: después basta con desbloquear. Tu master password se usa solo en este navegador; nunca se envía.'),
     form,
   );
+}
+
+// ───────────── vista: bloqueado (cuenta recordada) ─────────────
+
+function lockedView(status: Status): HTMLElement {
+  const password = h('input', { type: 'password', required: true, autocomplete: 'current-password', placeholder: 'Master password' });
+  const error = h('p', { class: 'error', hidden: true });
+  const submit = h('button', { class: 'btn', type: 'submit' }, 'Desbloquear');
+
+  const form = h(
+    'form',
+    {
+      onsubmit: async (e: Event) => {
+        e.preventDefault();
+        error.hidden = true;
+        submit.disabled = true;
+        submit.textContent = 'Desbloqueando…';
+        try {
+          const res = await send<{ needsTotp: boolean }>({ type: 'unlock-local', password: password.value });
+          password.value = '';
+          await render(res.needsTotp);
+        } catch (err) {
+          error.textContent = err instanceof Error ? err.message : 'Error inesperado';
+          error.hidden = false;
+          submit.disabled = false;
+          submit.textContent = 'Desbloquear';
+        }
+      },
+    },
+    h('label', { for: 'pw' }, 'Master password'),
+    Object.assign(password, { id: 'pw' }),
+    error,
+    submit,
+  );
+
+  const useOther = h(
+    'button',
+    {
+      class: 'link-btn',
+      type: 'button',
+      onclick: async () => {
+        await send({ type: 'logout' });
+        await render();
+      },
+    },
+    'Usar otra cuenta',
+  );
+
+  queueMicrotask(() => password.focus());
+  return h(
+    'main',
+    {},
+    h('h1', {}, 'Bóveda bloqueada'),
+    h('p', { class: 'sub' }, h('span', { class: 'email-chip' }, status.email ?? '')),
+    status.bioEnrolled && bioSupported() ? bioButton() : null,
+    status.bioEnrolled && bioSupported() ? h('p', { class: 'or' }, 'o con tu master password') : null,
+    form,
+    h('div', { class: 'foot' }, useOther),
+  );
+}
+
+// ───────────── ventana de verificación biométrica ─────────────
+
+function bioView(mode: 'enroll' | 'unlock', status: Status): HTMLElement {
+  const info = h('p', { class: 'sub' });
+  const error = h('p', { class: 'error', hidden: true });
+  const action = h('button', { class: 'btn', type: 'button' }, mode === 'unlock' ? 'Verificar' : 'Activar');
+  const fallback = h('button', { class: 'link-btn', type: 'button', onclick: () => window.close() }, mode === 'unlock' ? 'Usar la master password' : 'Cancelar');
+
+  function fail(err: unknown): void {
+    const msg = err instanceof BioError ? err.message : err instanceof Error ? err.message : BIO_MESSAGES.failed;
+    error.textContent = msg;
+    error.hidden = false;
+    action.disabled = false;
+    action.textContent = 'Reintentar';
+  }
+
+  function done(text: string): void {
+    action.hidden = true;
+    fallback.hidden = true;
+    error.hidden = true;
+    info.textContent = text;
+    info.classList.add('ok');
+    window.setTimeout(() => window.close(), 1100);
+  }
+
+  async function run(): Promise<void> {
+    error.hidden = true;
+    action.disabled = true;
+    action.textContent = 'Esperando verificación…';
+    try {
+      if (!bioSupported()) throw new BioError('unsupported', BIO_MESSAGES.unsupported);
+      if (mode === 'unlock') {
+        const bio = await send<{ enrolled: boolean; rpId: string; credId: string; prfSalt: string }>({ type: 'bio-info' });
+        if (!bio.enrolled) throw new Error('El desbloqueo rápido no está activado.');
+        const prf = await getBioPrf({ rpId: bio.rpId, credId: bio.credId, prfSalt: bio.prfSalt });
+        await send({ type: 'bio-unlock', prfOutput: toB64(prf) });
+        done('Desbloqueado ✔ Pulsa el icono de Nexor para usarlo.');
+      } else {
+        const userId = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(status.email ?? 'nexor')));
+        // Primero el dominio del servidor (Chrome ≥122 y Firefox ≥150 lo permiten a las extensiones con permiso de host);
+        // si el navegador lo rechaza, el propio origen de la extensión.
+        const candidates = [new URL(status.serverUrl).hostname, location.hostname];
+        let lastErr: unknown;
+        let enrolled = false;
+        for (const rpId of candidates) {
+          try {
+            const cred = await createBioCredential({ rpId, rpName: 'Nexor Vault', userName: status.email ?? 'Nexor', userId });
+            await send({ type: 'bio-enroll', rpId, credId: cred.credId, prfSalt: cred.prfSalt, prfOutput: toB64(cred.prfOutput) });
+            enrolled = true;
+            break;
+          } catch (err) {
+            lastErr = err;
+            if (!(err instanceof BioError && err.code === 'wrong-site')) throw err; // solo se reintenta si fue por el dominio
+          }
+        }
+        if (!enrolled) throw lastErr;
+        done('Desbloqueo rápido activado ✔');
+      }
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  action.addEventListener('click', () => void run());
+  info.textContent =
+    mode === 'unlock'
+      ? 'Usa tu huella, Face ID, el PIN de tu dispositivo o tu llave de seguridad.'
+      : 'En vez de escribir la master password, usarás tu huella, Face ID, el PIN del dispositivo o una llave de seguridad. La master password seguirá funcionando siempre.';
+  // Al desbloquear se lanza solo; al activar, el usuario debe pulsar (algunos navegadores lo exigen).
+  if (mode === 'unlock') queueMicrotask(() => void run());
+  return h('main', {}, h('h1', {}, mode === 'unlock' ? 'Verifica que eres tú' : 'Activar desbloqueo rápido'), info, error, action, h('div', { class: 'foot' }, fallback));
 }
 
 // ───────────── vista: código 2FA de la cuenta ─────────────
@@ -284,7 +435,50 @@ async function unlockedView(): Promise<HTMLElement> {
   search.addEventListener('input', paint);
   paint();
   queueMicrotask(() => search.focus());
-  return h('main', {}, search, list);
+
+  const { status } = await send<{ status: Status }>({ type: 'status' });
+  const foot = h('div', { class: 'foot' });
+  if (bioSupported()) {
+    foot.append(
+      status.bioEnrolled
+        ? h(
+            'button',
+            {
+              class: 'link-btn',
+              type: 'button',
+              onclick: async () => {
+                await send({ type: 'bio-remove' });
+                toast('Desbloqueo rápido desactivado');
+                await render();
+              },
+            },
+            'Desactivar desbloqueo rápido',
+          )
+        : h('button', { class: 'link-btn', type: 'button', onclick: () => openBioWindow('enroll') }, 'Activar huella / Face ID / llave'),
+    );
+  }
+  let armed = false;
+  foot.append(
+    h(
+      'button',
+      {
+        class: 'link-btn',
+        type: 'button',
+        onclick: async (e: Event) => {
+          const btn = e.currentTarget as HTMLButtonElement;
+          if (!armed) {
+            armed = true;
+            btn.textContent = '¿Seguro? Pulsa otra vez';
+            return;
+          }
+          await send({ type: 'logout' });
+          await render();
+        },
+      },
+      'Cerrar sesión',
+    ),
+  );
+  return h('main', {}, search, list, foot);
 }
 
 // ───────────── arranque ─────────────
@@ -298,12 +492,23 @@ async function render(forceTotp = false): Promise<void> {
     return;
   }
 
+  // Ventana de verificación biométrica (se abre aparte desde el popup).
+  const bioMode = new URLSearchParams(location.search).get('bio');
+  if (bioMode === 'unlock' || bioMode === 'enroll') {
+    if (bioMode === 'enroll' && !status.unlocked) {
+      app.replaceChildren(header(), h('main', {}, h('p', { class: 'error' }, 'Desbloquea la bóveda en el popup antes de activar el desbloqueo rápido.')));
+      return;
+    }
+    app.replaceChildren(header(), bioView(bioMode, status));
+    return;
+  }
+
   if (status.pendingTotp || forceTotp) {
     app.replaceChildren(header(status), totpView());
     return;
   }
   if (!status.unlocked) {
-    app.replaceChildren(header(status), lockedView(status));
+    app.replaceChildren(header(status), status.hasAccount ? lockedView(status) : loginView(status));
     return;
   }
   try {

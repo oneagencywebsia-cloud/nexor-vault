@@ -79,8 +79,10 @@ export default function PrivacyPage() {
             <Li><b>Lee la dirección (URL) de la pestaña activa solo cuando abres la extensión o usas el atajo</b> (permiso <i>activeTab</i>), para compararla con tus accesos y rellenar solo si el dominio coincide. No la guarda ni la envía a nadie.</Li>
             <Li>Escribe el usuario, la contraseña y el código 2FA en los campos de la página que tú eliges. Nunca envía el formulario por ti.</Li>
             <Li>Se comunica <b>únicamente con el servidor de Nexor</b> por HTTPS para iniciar sesión y descargar tu bóveda cifrada. Los datos se descifran en tu navegador.</Li>
-            <Li>Tu master password no se guarda ni se envía. La clave de la bóveda y el token de sesión se mantienen <b>solo en memoria</b> y se borran al bloquear (automáticamente tras 10 minutos de inactividad) o al cerrar el navegador.</Li>
-            <Li>En el almacenamiento local solo se guarda un ajuste no sensible: la URL del servidor.</Li>
+            <Li>Tu master password no se guarda ni se envía.</Li>
+            <Li>La <b>clave de la bóveda</b> en claro se mantiene <b>solo en memoria</b> y se borra al bloquear (automáticamente tras 10 minutos de inactividad) o al cerrar el navegador.</Li>
+            <Li>Para que no tengas que iniciar sesión de nuevo cada vez que abres el navegador, la extensión guarda en su almacenamiento local tu <b>cuenta</b> (email, servidor y salt) y un <b>token de sesión de hasta 14 días</b>. Con ese token no se puede leer tu bóveda (está cifrada), pero sí hablar con el servidor en tu nombre hasta que caduque: puedes borrarlo en cualquier momento con «Cerrar sesión».</Li>
+            <Li>Si activas el <b>desbloqueo con huella, Face ID o llave de seguridad</b>, se guarda tu clave de la bóveda <b>cifrada</b> con un secreto que solo tu autenticador puede calcular (WebAuthn PRF). Tu huella o rostro nunca salen del dispositivo ni llegan a Nexor.</Li>
             <Li>No incluye código remoto, ni analítica, ni rastreadores, ni anuncios, y no lee el contenido de las páginas más allá de localizar los campos de inicio de sesión al rellenar.</Li>
           </ul>
 
@@ -138,7 +140,9 @@ export default function PrivacyPage() {
             <Li>Reads the URL of the active tab <b>only when you open the extension or use the shortcut</b> (<i>activeTab</i> permission) to match it against your saved logins. It is neither stored nor sent anywhere.</Li>
             <Li>Writes the username, password and 2FA code into the fields of the page you choose. It never submits the form for you.</Li>
             <Li>Communicates <b>only with the Nexor server</b> over HTTPS to sign in and download your encrypted vault, which is decrypted in your browser.</Li>
-            <Li>The vault key and session token are kept <b>in memory only</b> and cleared when the vault locks (automatically after 10 minutes of inactivity) or the browser closes. The master password is never stored or sent.</Li>
+            <Li>The master password is never stored or sent. The plaintext vault key is kept <b>in memory only</b> and cleared when the vault locks (automatically after 10 minutes of inactivity) or the browser closes.</Li>
+            <Li>So you do not have to sign in again every time the browser opens, the extension stores in local storage your <b>account</b> (email, server, salt) and a <b>session token valid for up to 14 days</b>. It cannot decrypt your vault, but it can talk to the server on your behalf until it expires; &ldquo;Sign out&rdquo; deletes it.</Li>
+            <Li>If you enable <b>unlock with fingerprint, Face ID or a security key</b>, your vault key is stored <b>encrypted</b> with a secret only your authenticator can compute (WebAuthn PRF). Your biometrics never leave the device or reach Nexor.</Li>
             <Li>No remote code, analytics, trackers or ads.</Li>
           </ul>
 

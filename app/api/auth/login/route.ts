@@ -47,6 +47,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ requiresTotp: true, pendingToken });
   }
 
-  const token = await createSessionCookie({ userId: user.id, email: user.email });
+  const token = await createSessionCookie({ userId: user.id, email: user.email }, { extension: body.client === 'extension' });
   return NextResponse.json({ ok: true, userId: user.id, email: user.email, token });
 }

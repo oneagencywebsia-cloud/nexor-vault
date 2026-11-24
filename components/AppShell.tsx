@@ -44,7 +44,7 @@ function SideNav() {
   const pathname = usePathname();
   const activeIndex = TABS.findIndex(({ href }) => pathname === href || pathname?.startsWith(href + '/'));
   return (
-    <aside className="safe-top fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-white/80 px-4 pb-6 pt-6 backdrop-blur-md lg:flex xl:w-64">
+    <aside className="safe-top fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-white/80 px-4 pb-6 pt-6 backdrop-blur-md desk:flex">
       <Link href="/" className="mb-8 flex items-center gap-2.5 px-2">
         <NexorMark size={26} id="side" />
         <span className="text-[15px] font-black tracking-[0.18em] text-foreground">NEXOR</span>
@@ -85,9 +85,9 @@ function SideNav() {
 export function TopBar({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
   return (
     <header className="safe-top nexor-glass sticky top-0 z-30 border-b border-line">
-      <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-3.5 md:max-w-3xl lg:max-w-4xl lg:py-4">
+      <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-3.5 md:max-w-3xl desk:max-w-4xl desk:py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="lg:hidden">
+          <span className="desk:hidden">
             <NexorMark size={22} id="topbar" />
           </span>
           <div className="min-w-0">
@@ -300,23 +300,23 @@ export function AppShell({
   const scene = SCENE_BY_SECTION[section] ?? 'vault';
 
   return (
-    <div data-section={section} className="nexor-mesh-bg relative flex min-h-dvh flex-col bg-void lg:pl-60 xl:pl-64">
+    <div data-section={section} className="nexor-mesh-bg relative flex min-h-dvh flex-col bg-void desk:pl-60">
       <SideNav />
       {/* destello de color de la sección al entrar: es lo que hace visible la transición */}
       <div aria-hidden className="nexor-wash" />
       {/* fondo animado infinito que representa la sección actual: ocupa toda la
           pantalla, fijo detrás del contenido (no se corta ni se mueve al hacer scroll) */}
-      <div className="pointer-events-none fixed inset-0 z-0 lg:left-60 xl:left-64">
+      <div className="pointer-events-none fixed inset-0 z-0 desk:left-60">
         <SectionBackdrop scene={scene} key={scene} fade="transparent" className="opacity-45" />
       </div>
       <PushSetup />
       <TopBar title={title} subtitle={subtitle} right={right} />
-      <main className="nexor-page-anim relative z-10 mx-auto w-full max-w-2xl flex-1 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-5 md:max-w-3xl lg:max-w-4xl lg:px-8 lg:pb-12 lg:pt-7">
+      <main className="nexor-page-anim relative z-10 mx-auto w-full max-w-2xl flex-1 px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-5 sm:pt-5 md:max-w-3xl desk:max-w-4xl desk:px-8 desk:pb-12 desk:pt-7">
         {children}
       </main>
       {/* el contenido se funde con el fondo antes de llegar a la barra inferior */}
-      <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-40 bg-gradient-to-t from-white via-white/75 to-transparent lg:hidden" />
-      <div className="lg:hidden">
+      <div aria-hidden className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-40 bg-gradient-to-t from-white via-white/75 to-transparent desk:hidden" />
+      <div className="desk:hidden">
         <BottomTabBar />
       </div>
     </div>

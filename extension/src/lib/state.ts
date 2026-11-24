@@ -1,27 +1,39 @@
 // Estado de la extensión.
-//  · chrome.storage.session: solo en memoria (se borra al cerrar el navegador y
-//    NO se escribe en disco). Aquí viven el token de sesión y la vault key.
-//    Por defecto solo lo leen contextos de confianza (service worker y popup),
+//  · chrome.storage.session: SOLO en memoria (se borra al cerrar el navegador y NO
+//    se escribe en disco). Aquí vive la clave de la bóveda mientras está
+//    desbloqueada. Solo la leen contextos de confianza (service worker y popup),
 //    nunca un content script ni una página web.
-//  · chrome.storage.local: solo ajustes no secretos (URL del servidor).
+//  · chrome.storage.local: lo que permite NO volver a iniciar sesión tras cerrar el
+//    navegador: la cuenta (email, servidor, salt, token de sesión de larga
+//    duración) y, si el usuario lo activa, la clave de la bóveda CIFRADA con su
+//    huella/Face ID/llave (BioRecord). La clave de la bóveda en claro nunca se
+//    guarda en disco.
 
+import type { BioRecord } from '@/lib/biometric';
 import { DEFAULT_SERVER } from './types';
+
+export interface Account {
+  email: string;
+  serverUrl: string;
+  salt: string;
+  token: string;
+}
 
 export interface PendingLogin {
   pendingToken: string;
   vaultKey: string; // base64
   email: string;
+  salt: string;
+  serverUrl: string;
 }
 
 export interface SessionState {
-  token?: string;
-  email?: string;
   vaultKey?: string; // base64
   lockAt?: number;
   pending?: PendingLogin;
 }
 
-const SESSION_KEYS = ['token', 'email', 'vaultKey', 'lockAt', 'pending'] as const;
+const SESSION_KEYS = ['vaultKey', 'lockAt', 'pending'] as const;
 
 export async function getSession(): Promise<SessionState> {
   return (await chrome.storage.session.get([...SESSION_KEYS])) as SessionState;
@@ -35,7 +47,41 @@ export async function clearSession(): Promise<void> {
   await chrome.storage.session.remove([...SESSION_KEYS]);
 }
 
+// ───────────── cuenta recordada (disco) ─────────────
+
+export async function getAccount(): Promise<Account | null> {
+  const { account } = (await chrome.storage.local.get('account')) as { account?: Account };
+  return account?.token && account.email ? account : null;
+}
+
+export async function setAccount(account: Account): Promise<void> {
+  await chrome.storage.local.set({ account });
+}
+
+export async function clearAccount(): Promise<void> {
+  await chrome.storage.local.remove('account');
+}
+
+// ───────────── desbloqueo biométrico (disco, ya cifrado) ─────────────
+
+export async function getBio(): Promise<BioRecord | null> {
+  const { bio } = (await chrome.storage.local.get('bio')) as { bio?: BioRecord };
+  return bio?.v === 1 ? bio : null;
+}
+
+export async function setBio(bio: BioRecord): Promise<void> {
+  await chrome.storage.local.set({ bio });
+}
+
+export async function clearBio(): Promise<void> {
+  await chrome.storage.local.remove('bio');
+}
+
+// ───────────── ajustes ─────────────
+
 export async function getServerUrl(): Promise<string> {
+  const account = await getAccount();
+  if (account) return account.serverUrl;
   const { serverUrl } = (await chrome.storage.local.get('serverUrl')) as { serverUrl?: string };
   return serverUrl || DEFAULT_SERVER;
 }

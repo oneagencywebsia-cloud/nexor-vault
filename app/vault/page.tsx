@@ -811,7 +811,7 @@ export default function VaultPage() {
       <button
         onClick={openCreate}
         aria-label="Nuevo item"
-        className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-14 w-14 sm:right-6 lg:bottom-10 lg:right-10 lg:h-16 lg:w-16 hover:scale-105 transition-transform place-items-center rounded-full bg-purple text-white shadow-[0_10px_30px_-8px_rgba(108,92,231,0.8)] transition-transform active:scale-90"
+        className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-4 z-20 grid h-14 w-14 sm:right-6 desk:bottom-10 desk:right-10 desk:h-16 desk:w-16 hover:scale-105 transition-transform place-items-center rounded-full bg-purple text-white shadow-[0_10px_30px_-8px_rgba(108,92,231,0.8)] transition-transform active:scale-90"
       >
         <Plus size={26} strokeWidth={2.4} />
       </button>

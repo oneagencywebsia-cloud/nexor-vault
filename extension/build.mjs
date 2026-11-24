@@ -58,7 +58,7 @@ const common = {
 const manifests = {
   chrome: {
     ...common,
-    minimum_chrome_version: '116',
+    minimum_chrome_version: '122',
     background: { service_worker: 'background.js', type: 'module' },
   },
   firefox: {
