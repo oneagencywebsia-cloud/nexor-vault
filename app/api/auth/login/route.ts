@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createSessionCookie, signPendingTotpToken } from '@/lib/session';
-import { checkRateLimit, clearAttempts, recordFailedAttempt } from '@/lib/rate-limit';
-
-function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
+import { checkRateLimit, clearAttempts, recordFailedAttempt, tooManyRequests } from '@/lib/rate-limit';
+import { hashAuthHash, verifyAuthHash } from '@/lib/auth-hash';
+import { readJson } from '@/lib/request';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await readJson(req);
   const email = String(body.email || '').toLowerCase().trim();
   const authHash = String(body.authHash || '');
 
@@ -22,12 +16,7 @@ export async function POST(req: NextRequest) {
 
   const rateLimitId = `login:${email}`;
   const rate = await checkRateLimit(rateLimitId);
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: 'Demasiados intentos. Inténtalo de nuevo en unos minutos.' },
-      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } },
-    );
-  }
+  if (!rate.allowed) return tooManyRequests(rate);
 
   const { data: user } = await supabaseAdmin
     .from('app_users')
@@ -35,12 +24,18 @@ export async function POST(req: NextRequest) {
     .eq('email', email)
     .maybeSingle();
 
-  if (!user || !safeCompare(user.auth_hash, authHash)) {
+  const check = await verifyAuthHash(user?.auth_hash, authHash);
+  if (!user || !check.ok) {
     await recordFailedAttempt(rateLimitId);
     return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 });
   }
 
   await clearAttempts(rateLimitId);
+
+  // Cuenta antigua con el hash en claro: se guarda ya con scrypt + sal.
+  if (check.needsUpgrade) {
+    await supabaseAdmin.from('app_users').update({ auth_hash: await hashAuthHash(authHash) }).eq('id', user.id);
+  }
 
   if (user.totp_enabled) {
     const pendingToken = await signPendingTotpToken({ userId: user.id, email: user.email });

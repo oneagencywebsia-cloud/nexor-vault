@@ -1,23 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { ownsFolder, readJson } from '@/lib/request';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession(req);
   if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   const { id } = await params;
 
-  const body = await req.json();
-  const { encryptedBlob, folderId, itemType } = body;
+  const body = await readJson(req);
+  const { encryptedBlob, folderId, itemType } = body as { encryptedBlob?: { iv?: string; ciphertext?: string }; folderId?: unknown; itemType?: string };
   if (!encryptedBlob?.iv || !encryptedBlob?.ciphertext) {
     return NextResponse.json({ error: 'encryptedBlob inválido' }, { status: 400 });
+  }
+  if (!(await ownsFolder(session.userId, folderId))) {
+    return NextResponse.json({ error: 'Carpeta no válida' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
     .from('vault_items')
     .update({
       encrypted_blob: JSON.stringify(encryptedBlob),
-      folder_id: folderId ?? null,
+      folder_id: (folderId as string | null | undefined) ?? null,
       item_type: itemType || 'login',
       updated_at: new Date().toISOString(),
     })

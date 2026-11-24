@@ -8,6 +8,7 @@ const securityHeaders = [
   // No credentialless: la extensión hace fetch cross-origin con Authorization
   // header (no cookies), así que no hace falta relajar más que esto.
   { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
 ];
 
 const nextConfig: NextConfig = {

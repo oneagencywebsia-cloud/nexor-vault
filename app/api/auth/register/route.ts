@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createSessionCookie } from '@/lib/session';
+import { consumeRateLimit, tooManyRequests } from '@/lib/rate-limit';
+import { hashAuthHash } from '@/lib/auth-hash';
+import { clientIp, readJson } from '@/lib/request';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  // 10 altas por hora y por IP: frena el registro masivo de cuentas.
+  const rate = await consumeRateLimit(`register:${clientIp(req)}`, 10, 60 * 60 * 1000);
+  if (!rate.allowed) return tooManyRequests(rate);
+
+  const body = await readJson(req);
   const email = String(body.email || '').toLowerCase().trim();
   const authHash = String(body.authHash || '');
   const salt = String(body.salt || '');
@@ -12,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!email || !authHash || !salt || !kdfParams) {
     return NextResponse.json({ error: 'Faltan campos' }, { status: 400 });
   }
-  if (!/^\S+@\S+\.\S+$/.test(email)) {
+  if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) {
     return NextResponse.json({ error: 'Email inválido' }, { status: 400 });
   }
 
@@ -27,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data: user, error } = await supabaseAdmin
     .from('app_users')
-    .insert({ email, auth_hash: authHash, kdf_salt: salt, kdf_params: kdfParams })
+    .insert({ email, auth_hash: await hashAuthHash(authHash), kdf_salt: salt, kdf_params: kdfParams })
     .select('id, email')
     .single();
 

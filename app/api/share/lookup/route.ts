@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { consumeRateLimit, tooManyRequests } from '@/lib/rate-limit';
 
 // Busca la clave pública de un usuario por email para poder compartirle un
 // item. Solo devuelve la clave pública (por definición no sensible) — nunca
@@ -8,6 +9,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+
+  // Evita usar este endpoint para averiguar en masa qué emails tienen cuenta.
+  const rate = await consumeRateLimit(`lookup:${session.userId}`, 30);
+  if (!rate.allowed) return tooManyRequests(rate);
 
   const email = req.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   if (!email) return NextResponse.json({ error: 'email requerido' }, { status: 400 });

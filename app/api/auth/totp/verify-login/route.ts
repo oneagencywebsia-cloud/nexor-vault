@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSessionCookie, verifyPendingTotpToken } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyTotp } from '@/lib/totp';
-import { checkRateLimit, clearAttempts, recordFailedAttempt } from '@/lib/rate-limit';
+import { checkRateLimit, clearAttempts, recordFailedAttempt, tooManyRequests } from '@/lib/rate-limit';
+import { readJson } from '@/lib/request';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await readJson(req);
   const pendingToken = String(body.pendingToken || '');
   const code = String(body.code || '');
 
@@ -16,12 +17,7 @@ export async function POST(req: NextRequest) {
   // intentos sería fuerza-bruteable en minutos pese al 2FA.
   const rateLimitId = `totp:${pending.userId}`;
   const rate = await checkRateLimit(rateLimitId);
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: 'Demasiados intentos. Inténtalo de nuevo en unos minutos.' },
-      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } },
-    );
-  }
+  if (!rate.allowed) return tooManyRequests(rate);
 
   const { data: user } = await supabaseAdmin
     .from('app_users')

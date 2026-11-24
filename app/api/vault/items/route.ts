@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { ownsFolder, readJson } from '@/lib/request';
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req);
@@ -20,10 +21,13 @@ export async function POST(req: NextRequest) {
   const session = await getSession(req);
   if (!session) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
 
-  const body = await req.json();
-  const { itemType, encryptedBlob, folderId } = body;
+  const body = await readJson(req);
+  const { itemType, encryptedBlob, folderId } = body as { itemType?: string; encryptedBlob?: { iv?: string; ciphertext?: string }; folderId?: unknown };
   if (!encryptedBlob?.iv || !encryptedBlob?.ciphertext) {
     return NextResponse.json({ error: 'encryptedBlob inválido' }, { status: 400 });
+  }
+  if (!(await ownsFolder(session.userId, folderId))) {
+    return NextResponse.json({ error: 'Carpeta no válida' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
@@ -32,7 +36,7 @@ export async function POST(req: NextRequest) {
       user_id: session.userId,
       item_type: itemType || 'login',
       encrypted_blob: JSON.stringify(encryptedBlob),
-      folder_id: folderId || null,
+      folder_id: (folderId as string) || null,
     })
     .select('id, item_type, encrypted_blob, folder_id, created_at, updated_at')
     .single();
