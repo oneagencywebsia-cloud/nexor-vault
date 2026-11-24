@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Download, Keyboard, Lock, MousePointerClick, ShieldCheck, Smartphone, Share2 } from 'lucide-react';
+import { Keyboard, Lock, MousePointerClick, ShieldCheck, Smartphone, Share2 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { ExtensionDownload } from '@/components/ExtensionDownload';
 
 export const metadata = { title: 'Extensión de navegador' };
 
@@ -15,32 +16,9 @@ const SECURITY = [
 export default function ExtensionPage() {
   return (
     <AppShell title="Extensión" subtitle="Rellena en un clic desde tu navegador">
-      <section className="nexor-rise mb-5 rounded-3xl border border-line bg-surface p-5">
-        <h2 className="flex items-center gap-2 text-[16px] font-black">
-          <Download size={18} className="text-purple" /> Descargar
-        </h2>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-dim">
-          Mismo código para todos los navegadores. Todo se descifra en tu navegador, igual que en la web.
-        </p>
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-          <a
-            href="/downloads/nexor-vault-chrome.zip"
-            download
-            className="rounded-2xl bg-purple px-4 py-3.5 text-center text-[14px] font-bold text-white shadow-[0_8px_20px_-8px_rgba(108,92,231,0.8)] transition-transform active:scale-95"
-          >
-            Chrome · Edge · Brave
-          </a>
-          <a
-            href="/downloads/nexor-vault-firefox.zip"
-            download
-            className="rounded-2xl border border-line-strong bg-white px-4 py-3.5 text-center text-[14px] font-bold transition-colors hover:border-purple hover:text-purple"
-          >
-            Firefox
-          </a>
-        </div>
-      </section>
+      <ExtensionDownload />
 
-      <section className="nexor-rise mb-5 rounded-3xl border border-line bg-surface p-5" style={{ ['--i' as string]: 1 }}>
+      <section className="nexor-rise mb-5 rounded-3xl border border-line bg-surface p-5 pointer-coarse:hidden" style={{ ['--i' as string]: 1 }}>
         <h2 className="text-[16px] font-black">Instalar (2 minutos)</h2>
         <ol className="mt-3 space-y-3 text-[13.5px] leading-relaxed">
           {[
@@ -66,7 +44,7 @@ export default function ExtensionPage() {
         </p>
       </section>
 
-      <section className="nexor-rise mb-5 rounded-3xl border border-line bg-surface p-5" style={{ ['--i' as string]: 2 }}>
+      <section className="nexor-rise mb-5 rounded-3xl border border-line bg-surface p-5 pointer-coarse:hidden" style={{ ['--i' as string]: 2 }}>
         <h2 className="text-[16px] font-black">Cómo se usa</h2>
         <ul className="mt-3 space-y-3 text-[13.5px] leading-relaxed">
           <li className="flex gap-3">
@@ -119,13 +97,16 @@ export default function ExtensionPage() {
           <li className="flex gap-3">
             <Smartphone size={18} className="mt-0.5 shrink-0 text-purple" />
             <span>
-              <b>Firefox para Android / Kiwi:</b> admiten extensiones; esta misma extensión puede usarse allí (pendiente de probar en dispositivo).
+              <b>Otros navegadores móviles:</b> Chrome para Android no admite extensiones, y Firefox para Android solo instala las publicadas en la tienda de Mozilla (esta aún no lo está). Por eso el menú Compartir es la vía que funciona hoy.
             </span>
           </li>
         </ul>
         <Link href="/open" className="mt-4 inline-block rounded-xl bg-purple/10 px-3.5 py-2 text-[13px] font-bold text-purple">
           Abrir acceso rápido
         </Link>
+        <p className="mt-5 text-[12px] text-dim">
+          Cómo tratamos tus datos: <Link href="/privacy" className="font-semibold text-purple underline">política de privacidad</Link>.
+        </p>
       </section>
     </AppShell>
   );

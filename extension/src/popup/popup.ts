@@ -88,6 +88,8 @@ function lockedView(status: Status): HTMLElement {
   const server = h('input', { type: 'url', value: status.serverUrl || DEFAULT_SERVER, placeholder: DEFAULT_SERVER });
   const error = h('p', { class: 'error', hidden: true });
   const submit = h('button', { class: 'btn', type: 'submit' }, 'Desbloquear');
+  // Solo las compilaciones para instalaciones propias (--custom-server) permiten otro servidor.
+  const canCustomServer = !!chrome.runtime.getManifest().optional_host_permissions?.length;
 
   const form = h(
     'form',
@@ -119,7 +121,7 @@ function lockedView(status: Status): HTMLElement {
     Object.assign(email, { id: 'email' }),
     h('label', { for: 'pw' }, 'Master password'),
     Object.assign(password, { id: 'pw' }),
-    h('details', {}, h('summary', {}, 'Servidor (avanzado)'), server),
+    canCustomServer ? h('details', {}, h('summary', {}, 'Servidor (avanzado)'), server) : null,
     error,
     submit,
   );

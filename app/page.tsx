@@ -494,6 +494,7 @@ export default function Home() {
           <span className="flex gap-5 font-semibold">
             <Link href="/login" className="hover:text-purple">Iniciar sesión</Link>
             <Link href="/register" className="hover:text-purple">Crear cuenta</Link>
+            <Link href="/privacy" className="hover:text-purple">Privacidad</Link>
           </span>
         </div>
       </footer>

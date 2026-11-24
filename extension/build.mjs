@@ -18,6 +18,9 @@ const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const publish = process.argv.includes('--publish');
 const wantZip = process.argv.includes('--zip') || publish;
 
+// --custom-server: permite al usuario elegir otro servidor (instalaciones propias). La versión de las
+// tiendas NO lo incluye: pide un único permiso de host (el servidor de Nexor) y se revisa más rápido.
+const customServer = process.argv.includes('--custom-server');
 const serverArg = process.argv.find((a) => a.startsWith('--server='));
 const SERVER_ORIGIN = serverArg ? new URL(serverArg.slice('--server='.length)).origin : 'https://software-nexor.p08ks6.easypanel.host';
 
@@ -37,7 +40,8 @@ const common = {
   // en la pestaña activa cuando el usuario lo pide (activeTab + scripting).
   permissions: ['storage', 'alarms', 'activeTab', 'scripting'],
   host_permissions: [`${SERVER_ORIGIN}/*`],
-  optional_host_permissions: ['https://*/*', 'http://localhost/*'],
+  ...(customServer ? { optional_host_permissions: ['https://*/*', 'http://localhost/*'] } : {}),
+  homepage_url: SERVER_ORIGIN,
   commands: {
     'fill-login': {
       suggested_key: { default: 'Alt+Shift+L', mac: 'Alt+Shift+L' },
@@ -60,7 +64,15 @@ const manifests = {
   firefox: {
     ...common,
     background: { scripts: ['background.js'], type: 'module' },
-    browser_specific_settings: { gecko: { id: 'nexor-vault@nexor.app', strict_min_version: '128.0' } },
+    browser_specific_settings: {
+      gecko: {
+        id: 'nexor-vault@nexor.app',
+        strict_min_version: '142.0',
+        // Obligatorio en AMO: qué datos salen del navegador. Las credenciales (hash de autenticación)
+        // viajan solo al servidor de Nexor del propio usuario; no hay analítica ni terceros.
+        data_collection_permissions: { required: ['authenticationInfo'] },
+      },
+    },
   },
 };
 
