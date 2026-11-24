@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, ShieldCheck, Mail } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, ShieldCheck, Mail, Upload } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { inputClass, primaryButtonClass } from '@/components/AuthCard';
 
@@ -195,6 +196,20 @@ export default function SettingsPage() {
             </div>
           </form>
         )}
+      </div>
+
+      <p className="mb-2 mt-6 px-1 text-[12px] font-semibold uppercase tracking-wide text-dim">Datos</p>
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface/70">
+        <Link href="/import" className="flex w-full items-center gap-3 p-4 text-left active:bg-surface-2">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-purple/15 text-purple">
+            <Upload size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-foreground">Importar contraseñas</p>
+            <p className="text-[12px] text-dim">Desde Bitwarden, Chrome, 1Password, LastPass…</p>
+          </div>
+          <ChevronRight size={18} className="shrink-0 text-dim" />
+        </Link>
       </div>
 
       {error && <p className="mt-4 text-[13px] text-danger">{error}</p>}

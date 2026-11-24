@@ -352,7 +352,7 @@ export default function Home() {
           <Reveal index={2}>
             <div className="relative overflow-hidden rounded-[32px] border border-line bg-surface p-6 md:p-8">
               <div className="absolute inset-0 opacity-60">
-                <SectionBackdrop scene="share" />
+                <SectionBackdrop scene="share" fade="var(--nexor-surface)" />
               </div>
               <div className="relative z-10 grid items-center gap-3 text-center sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
                 {[
@@ -448,8 +448,8 @@ export default function Home() {
 
       {/* ───────── CTA final ───────── */}
       <section className="relative isolate overflow-hidden bg-purple py-20 text-center text-white md:py-24">
-        <div className="absolute inset-0 text-white opacity-30">
-          <SectionBackdrop scene="home" />
+        <div className="absolute inset-0 opacity-30">
+          <SectionBackdrop scene="home" fade="#6c5ce7" className="!text-white" />
         </div>
         <div className="relative z-10 mx-auto max-w-2xl px-5">
           <Reveal>

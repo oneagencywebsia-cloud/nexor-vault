@@ -140,6 +140,13 @@ export default function VaultPage() {
     }
     setItems(decrypted);
     setLoading(false);
+
+    // Enlace profundo desde las alertas de seguridad: /vault?open=<id> abre ese acceso.
+    const openId = new URLSearchParams(window.location.search).get('open');
+    if (openId && decrypted.some((i) => i.id === openId)) {
+      setViewItemId(openId);
+      window.history.replaceState(null, '', '/vault');
+    }
   }
 
   async function loadFolders(key: Uint8Array) {
@@ -698,14 +705,28 @@ export default function VaultPage() {
 
       {loading && <p className="text-[13px] text-dim">Descifrando vault…</p>}
       {!loading && filtered.length === 0 && childFolders.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-line-strong px-5 py-10 text-center">
-          <p className="text-[13px] text-dim">
-            {searching
-              ? 'Sin resultados.'
-              : activeFolderId
-                ? 'Esta carpeta está vacía.'
-                : 'Tu vault está vacío. Crea tu primer item o carpeta.'}
-          </p>
+        <div className="rounded-3xl border border-dashed border-line-strong px-5 py-10 text-center">
+          {searching || activeFolderId ? (
+            <p className="text-[13px] text-dim">{searching ? 'Sin resultados.' : 'Esta carpeta está vacía.'}</p>
+          ) : (
+            <>
+              <p className="text-[16px] font-black text-foreground">Tu vault está vacío</p>
+              <p className="mx-auto mt-1.5 max-w-xs text-[13px] leading-relaxed text-dim">
+                Empieza guardando tu primer acceso o trae los que ya tienes de otro gestor en un minuto.
+              </p>
+              <div className="mx-auto mt-5 flex max-w-xs flex-col gap-2">
+                <button onClick={openCreate} className={primaryButtonClass}>
+                  Guardar mi primer acceso
+                </button>
+                <a
+                  href="/import"
+                  className="rounded-2xl border border-line-strong bg-white py-3.5 text-center text-[15px] font-semibold text-foreground transition-colors hover:border-purple hover:text-purple"
+                >
+                  Importar desde otro gestor
+                </a>
+              </div>
+            </>
+          )}
         </div>
       )}
 

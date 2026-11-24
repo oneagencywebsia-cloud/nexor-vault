@@ -260,133 +260,254 @@ body {
   transform: none;
 }
 
-/* ───────────── Fondos animados infinitos por sección ───────────── */
+/* ───────────── Fondos animados infinitos por sección ─────────────
+   Cada elemento es una capa con un SVG estático; solo se anima transform y
+   opacity (compuesto en GPU, sin repintar). Tamaños y posiciones en unidades
+   de contenedor para que la escena se adapte a cualquier pantalla. */
 .nexor-backdrop {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  container-type: size;
+  contain: layout paint style;
 }
-.nexor-backdrop svg {
+/* fundido inferior con un degradado (más barato que una máscara) */
+.nexor-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 60%;
+  background: linear-gradient(180deg, transparent, var(--nx-fade, var(--nexor-void)));
+  z-index: 5;
+}
+
+.nx-l {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  /* alternativa para navegadores sin unidades de contenedor */
+  width: calc(var(--s) * 0.9vmin);
+  height: calc(var(--s) * 0.9vmin);
+  /* tope de tamaño: capas enormes en monitores grandes cuestan sin aportar */
+  width: min(calc(var(--s) * 1cqmin), 460px);
+  height: min(calc(var(--s) * 1cqmin), 460px);
+  transform: translate(-50%, -50%);
+  opacity: var(--o, 1);
+}
+.nx-l > svg,
+.nx-a > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.nx-a {
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+.nx-lines {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 
-@keyframes nx-float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(0, -22px, 0) rotate(6deg);
-  }
+/* formas básicas */
+.nx-disc {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: currentColor;
 }
-@keyframes nx-drift {
-  0% {
-    transform: translate3d(-6%, 0, 0);
-  }
-  100% {
-    transform: translate3d(106%, 0, 0);
-  }
+.nx-dot {
+  opacity: 0.45;
 }
-@keyframes nx-spin {
+.nx-packet {
+  opacity: 0.8;
+  box-shadow: 0 0 calc(2.4 * 1cqmin) currentColor;
+}
+.nx-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  opacity: 0.28;
+}
+.nx-ring-dash {
+  border-style: dashed;
+  opacity: 0.18;
+}
+.nx-sweep-beam {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg 292deg, currentColor 360deg);
+  opacity: 0.24;
+}
+.nx-orb {
+  position: absolute;
+  width: calc(var(--s) * 100%);
+  height: calc(var(--s) * 100%);
+  transform: translate(-50%, -50%);
+}
+.nx-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: 0.3;
+  animation: nx-scan 6.5s ease-in-out infinite;
+}
+
+/* movimientos (solo transform / opacity) */
+@keyframes nx-rot {
   to {
     transform: rotate(360deg);
   }
 }
-@keyframes nx-spin-rev {
-  to {
-    transform: rotate(-360deg);
+@keyframes nx-bob2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-3deg);
+  }
+  50% {
+    transform: translate3d(0, -14%, 0) rotate(5deg);
   }
 }
-@keyframes nx-pulse {
+@keyframes nx-ping {
   0% {
-    transform: scale(0.6);
-    opacity: 0.55;
+    transform: scale(0.5);
+    opacity: 0.6;
   }
   100% {
     transform: scale(2.4);
     opacity: 0;
   }
 }
-@keyframes nx-flow {
-  to {
-    stroke-dashoffset: -64;
+@keyframes nx-ping-slow {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@keyframes nx-fall {
+  0% {
+    transform: translate3d(0, -8cqh, 0);
+    opacity: 0;
+  }
+  10%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(0, 108cqh, 0);
+    opacity: 0;
+  }
+}
+@keyframes nx-sweep {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(calc(var(--dx) * 1cqw), calc(var(--dy) * 1cqh), 0);
+    opacity: 0;
   }
 }
 @keyframes nx-scan {
   0% {
-    transform: translate3d(0, -10%, 0);
+    transform: translate3d(0, -5cqh, 0);
     opacity: 0;
   }
-  15% {
-    opacity: 1;
-  }
+  15%,
   85% {
     opacity: 1;
   }
   100% {
-    transform: translate3d(0, 110%, 0);
+    transform: translate3d(0, 105cqh, 0);
     opacity: 0;
   }
 }
 @keyframes nx-blink {
   0%,
   100% {
-    opacity: 0.25;
+    opacity: 0.15;
+    transform: scale(0.8);
   }
   50% {
     opacity: 1;
+    transform: scale(1.25);
   }
 }
-@keyframes nx-rain {
-  from {
-    transform: translate3d(0, -20%, 0);
-  }
-  to {
-    transform: translate3d(0, 120%, 0);
-  }
+.nx-rot {
+  animation: nx-rot var(--t, 30s) linear infinite;
 }
-
-.nx-float {
-  animation: nx-float 7s ease-in-out infinite;
+.nx-rev {
+  animation-direction: reverse;
+}
+.nx-bob2 {
+  animation: nx-bob2 7s ease-in-out infinite;
   animation-delay: calc(var(--d, 0) * -1s);
 }
-.nx-spin {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: nx-spin 28s linear infinite;
-}
-.nx-spin-rev {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: nx-spin-rev 36s linear infinite;
-}
-.nx-pulse {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: nx-pulse 4.5s ease-out infinite;
+.nx-ping {
+  animation: nx-ping 4.5s ease-out infinite;
   animation-delay: calc(var(--d, 0) * -1s);
 }
-.nx-flow {
-  stroke-dasharray: 6 10;
-  animation: nx-flow 2.4s linear infinite;
+.nx-ping-slow {
+  animation: nx-ping-slow 6.5s ease-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
 }
-.nx-scan {
-  animation: nx-scan 6s ease-in-out infinite;
+.nx-fall {
+  animation: nx-fall var(--t, 10s) linear infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
+}
+.nx-sweep {
+  animation: nx-sweep var(--t, 4s) ease-in-out infinite;
+  animation-delay: calc(var(--d, 0) * -1s);
 }
 .nx-blink {
   animation: nx-blink 3s ease-in-out infinite;
   animation-delay: calc(var(--d, 0) * -1s);
 }
-.nx-rain {
-  animation: nx-rain 9s linear infinite;
-  animation-delay: calc(var(--d, 0) * -1s);
+
+/* fuera de pantalla: todo en pausa (no gasta batería ni GPU) */
+.nx-paused,
+.nx-paused * {
+  animation-play-state: paused !important;
+}
+
+/* equipos modestos: menos capas y giro por pasos (menos fotogramas que componer) */
+.nx-lite .nx-hide-sm,
+.nx-lite .nx-scan {
+  display: none;
+}
+.nx-lite .nx-rot {
+  animation-timing-function: steps(600);
+}
+.nx-lite .nx-packet {
+  box-shadow: none;
+}
+
+/* móviles y pantallas pequeñas: menos capas */
+@media (max-width: 640px) {
+  .nx-hide-sm {
+    display: none;
+  }
 }
 
 /* Cursor de botón con brillo que barre (landing) */

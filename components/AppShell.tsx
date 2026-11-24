@@ -282,7 +282,7 @@ export function AppShell({
       <SideNav />
       {/* fondo animado infinito que representa la sección actual */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[300px] sm:h-[380px] lg:h-[440px]">
-        <SectionBackdrop scene={scene} key={scene} />
+        <SectionBackdrop scene={scene} key={scene} className="opacity-60" />
       </div>
       <PushSetup />
       <TopBar title={title} subtitle={subtitle} right={right} />

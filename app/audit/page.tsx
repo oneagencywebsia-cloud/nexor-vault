@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { decryptJson, EncryptedBlob } from '@/lib/crypto';
 import { useVaultStore } from '@/lib/store';
-import { checkPwned, findReusedPasswordIds, scoreStrength, Strength } from '@/lib/audit';
+import { checkPwned, scoreStrength, Strength } from '@/lib/audit';
+import { buildAlerts, SEVERITY_LABEL, type Severity } from '@/lib/alerts';
 import { AppShell } from '@/components/AppShell';
 
 interface VaultItemData {
@@ -14,11 +16,13 @@ interface VaultItemData {
   password: string;
   url: string;
   notes: string;
+  totpSecret?: string;
 }
 
 interface RawItem {
   id: string;
   encrypted_blob: string;
+  updated_at: string;
 }
 
 interface AuditRow {
@@ -27,6 +31,9 @@ interface AuditRow {
   password: string;
   strength: Strength;
   reused: boolean;
+  reusedWith: string[];
+  hasTotp: boolean;
+  updatedAt: string;
   pwnedCount: number | null; // null = no comprobado aún
 }
 
@@ -55,26 +62,44 @@ export default function AuditPage() {
         return;
       }
       const { items: raw } = (await res.json()) as { items: RawItem[] };
-      const decrypted: { id: string; title: string; password: string }[] = [];
+      const decrypted: { id: string; title: string; password: string; hasTotp: boolean; updatedAt: string }[] = [];
       for (const item of raw) {
         try {
           const blob = JSON.parse(item.encrypted_blob) as EncryptedBlob;
           const data = await decryptJson<VaultItemData>(vaultKey, blob);
-          decrypted.push({ id: item.id, title: data.title || '(sin título)', password: data.password });
+          decrypted.push({
+            id: item.id,
+            title: data.title || '(sin título)',
+            password: data.password,
+            hasTotp: !!data.totpSecret,
+            updatedAt: item.updated_at,
+          });
         } catch {
           // omitido: no descifrable con esta vault key
         }
       }
-      const reused = findReusedPasswordIds(decrypted);
+      // grupos de contraseña repetida: cada item sabe con cuáles comparte
+      const byPassword = new Map<string, string[]>();
+      for (const d of decrypted) {
+        if (!d.password) continue;
+        byPassword.set(d.password, [...(byPassword.get(d.password) ?? []), d.id]);
+      }
       setRows(
-        decrypted.map((item) => ({
-          id: item.id,
-          title: item.title,
-          password: item.password,
-          strength: scoreStrength(item.password),
-          reused: reused.has(item.id),
-          pwnedCount: null,
-        })),
+        decrypted.map((item) => {
+          const group = item.password ? (byPassword.get(item.password) ?? []) : [];
+          const reusedWith = group.filter((id) => id !== item.id);
+          return {
+            id: item.id,
+            title: item.title,
+            password: item.password,
+            strength: scoreStrength(item.password),
+            reused: reusedWith.length > 0,
+            reusedWith,
+            hasTotp: item.hasTotp,
+            updatedAt: item.updatedAt,
+            pwnedCount: null,
+          };
+        }),
       );
       setLoading(false);
     })();
@@ -93,8 +118,17 @@ export default function AuditPage() {
     return { total, weak, reused, pwned, score };
   }, [rows]);
 
+  // Alertas priorizadas: qué arreglar primero, con el porqué y la acción
+  const alerts = useMemo(
+    () => buildAlerts(rows, new Map(rows.map((r) => [r.id, r.title]))),
+    [rows],
+  );
+  const pwnedChecked = rows.some((r) => r.pwnedCount !== null);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const visibleAlerts = showAllAlerts ? alerts : alerts.slice(0, 5);
+
   const scoreLabel = summary.score >= 90 ? 'Excelente' : summary.score >= 70 ? 'Bien' : summary.score >= 40 ? 'Mejorable' : 'Riesgo';
-  const scoreTone = summary.score >= 90 ? '#34d399' : summary.score >= 70 ? '#b8b3ff' : summary.score >= 40 ? '#fbbf24' : '#fb7185';
+  const scoreTone = summary.score >= 90 ? '#059669' : summary.score >= 70 ? '#6c5ce7' : summary.score >= 40 ? '#d97706' : '#e11d48';
 
   async function runPwnedCheck() {
     setCheckingPwned(true);
@@ -157,6 +191,62 @@ export default function AuditPage() {
             </div>
           </div>
 
+          {/* qué arreglar primero */}
+          <section className="mb-6">
+            <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-wide text-dim">Qué arreglar primero</h2>
+            {alerts.length === 0 ? (
+              <div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-4 text-[13.5px] text-success">
+                Todo en orden: no hay contraseñas débiles, repetidas ni antiguas.
+                {!pwnedChecked && ' Comprueba también las filtraciones más abajo.'}
+              </div>
+            ) : (
+              <ul className="space-y-2.5">
+                {visibleAlerts.map((a, i) => (
+                  <li
+                    key={a.id}
+                    className="nexor-rise relative overflow-hidden rounded-2xl border border-line bg-surface p-4 pl-5"
+                    style={{ ['--i' as string]: i }}
+                  >
+                    <span aria-hidden className={`absolute inset-y-0 left-0 w-1.5 ${SEVERITY_BAR[a.severity]}`} />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-black">{a.title}</p>
+                        <p className="mt-0.5 text-[13px] font-semibold text-foreground">{a.headline}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${SEVERITY_BADGE[a.severity]}`}>
+                        {SEVERITY_LABEL[a.severity]}
+                      </span>
+                    </div>
+                    <ul className="mt-2 space-y-0.5 text-[12.5px] leading-relaxed text-dim">
+                      {a.details.map((d) => (
+                        <li key={d}>· {d}</li>
+                      ))}
+                    </ul>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-[12.5px] font-semibold text-mist">{a.action}</p>
+                      <Link
+                        href={`/vault?open=${a.id}`}
+                        className="flex shrink-0 items-center gap-1 rounded-xl bg-purple px-3.5 py-2 text-[13px] font-bold text-white transition-transform active:scale-95"
+                      >
+                        Abrir <ArrowRight size={14} />
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {alerts.length > 5 && (
+              <button onClick={() => setShowAllAlerts((v) => !v)} className="mt-3 w-full text-center text-[13px] font-semibold text-purple">
+                {showAllAlerts ? 'Ver menos' : `Ver las ${alerts.length - 5} restantes`}
+              </button>
+            )}
+            {!pwnedChecked && alerts.length > 0 && (
+              <p className="mt-3 px-1 text-[12px] leading-relaxed text-dim">
+                Aún no se han comprobado las filtraciones: pulsa «Comprobar filtraciones» para ver el riesgo completo.
+              </p>
+            )}
+          </section>
+
           <div className="mb-5 grid grid-cols-3 gap-3">
             <StatTile value={summary.weak} label="débiles" />
             <StatTile value={summary.reused} label="reutilizadas" />
@@ -195,6 +285,19 @@ export default function AuditPage() {
     </AppShell>
   );
 }
+
+const SEVERITY_BAR: Record<Severity, string> = {
+  critical: 'bg-danger',
+  high: 'bg-warning',
+  medium: 'bg-purple',
+  low: 'bg-line-strong',
+};
+const SEVERITY_BADGE: Record<Severity, string> = {
+  critical: 'bg-danger/15 text-danger',
+  high: 'bg-warning/15 text-warning',
+  medium: 'bg-purple/15 text-purple',
+  low: 'bg-line-strong text-dim',
+};
 
 function StatTile({ value, label }: { value: number; label: string }) {
   return (
