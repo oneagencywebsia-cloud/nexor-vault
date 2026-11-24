@@ -13,7 +13,7 @@ export class ApiError extends Error {
 export async function api<T>(
   serverUrl: string,
   path: string,
-  opts: { method?: 'GET' | 'POST'; body?: unknown; token?: string } = {},
+  opts: { method?: 'GET' | 'POST' | 'PUT'; body?: unknown; token?: string } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';

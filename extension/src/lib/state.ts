@@ -77,6 +77,71 @@ export async function clearBio(): Promise<void> {
   await chrome.storage.local.remove('bio');
 }
 
+// ───────────── capturas pendientes (SOLO memoria) ─────────────
+// Lo que el usuario acaba de enviar en un formulario, a la espera de confirmar que
+// el login funcionó. Vive en storage.session (no toca el disco) y caduca en minutos.
+
+export interface PendingCapture {
+  url: string;
+  host: string;
+  username: string;
+  password: string;
+  kind: 'login' | 'register' | 'change';
+  at: number;
+}
+
+export interface Offer extends PendingCapture {
+  decision: 'new' | 'update' | 'same' | 'unknown';
+  itemId?: string;
+}
+
+export interface UsernameStep {
+  host: string;
+  username: string;
+  at: number;
+}
+
+type Bucket = 'captures' | 'offers' | 'steps';
+
+async function readBucket<T>(name: Bucket): Promise<Record<string, T>> {
+  const r = (await chrome.storage.session.get(name)) as Record<string, Record<string, T> | undefined>;
+  return r[name] ?? {};
+}
+
+export async function getEntry<T>(name: Bucket, tabId: number): Promise<T | undefined> {
+  return (await readBucket<T>(name))[String(tabId)];
+}
+
+export async function setEntry<T>(name: Bucket, tabId: number, value: T): Promise<void> {
+  const b = await readBucket<T>(name);
+  b[String(tabId)] = value;
+  await chrome.storage.session.set({ [name]: b });
+}
+
+export async function deleteEntry(name: Bucket, tabId: number): Promise<void> {
+  const b = await readBucket<unknown>(name);
+  if (!(String(tabId) in b)) return;
+  delete b[String(tabId)];
+  await chrome.storage.session.set({ [name]: b });
+}
+
+/** Olvida todo lo capturado (al bloquear o cerrar sesión). */
+export async function clearCaptures(): Promise<void> {
+  await chrome.storage.session.remove(['captures', 'offers', 'steps']);
+}
+
+// ───────────── webs donde no ofrecer guardar (disco) ─────────────
+
+export async function getNeverSave(): Promise<string[]> {
+  const { neverSave } = (await chrome.storage.local.get('neverSave')) as { neverSave?: string[] };
+  return Array.isArray(neverSave) ? neverSave : [];
+}
+
+export async function addNeverSave(host: string): Promise<void> {
+  const list = await getNeverSave();
+  if (!list.includes(host)) await chrome.storage.local.set({ neverSave: [...list, host].slice(-500) });
+}
+
 // ───────────── ajustes ─────────────
 
 export async function getServerUrl(): Promise<string> {

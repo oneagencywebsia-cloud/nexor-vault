@@ -9,6 +9,7 @@ export interface VaultItem {
   url: string;
   notes: string;
   totpSecret?: string;
+  folderId: string | null;
   updatedAt: string;
 }
 
@@ -37,7 +38,19 @@ export type Request =
   | { type: 'bio-remove' }
   | { type: 'items'; pageUrl: string }
   | { type: 'secret'; id: string; field: 'username' | 'password' | 'totp' }
-  | { type: 'fill'; id: string; tabId: number; allowRelated?: boolean };
+  | { type: 'fill'; id: string; tabId: number; allowRelated?: boolean }
+  /** Aviso "¿Guardar en Nexor?" de la pestaña (sin contraseña). */
+  | { type: 'capture-get'; tabId: number }
+  | { type: 'capture-save'; tabId: number }
+  | { type: 'capture-dismiss'; tabId: number; never?: boolean };
+
+/** Lo que el popup ve de un aviso de guardado: NUNCA la contraseña. */
+export interface CaptureOffer {
+  host: string;
+  username: string;
+  decision: 'new' | 'update';
+  title: string;
+}
 
 export type Response =
   | { ok: true; [key: string]: unknown }
@@ -52,7 +65,12 @@ export interface Status {
   email: string | null;
   serverUrl: string;
   pendingTotp: boolean;
+  /** La función "ofrecer guardar contraseñas" está activada (permiso concedido). */
+  captureEnabled: boolean;
 }
+
+/** Sitios en los que, con permiso del usuario, se puede detectar un inicio de sesión. */
+export const CAPTURE_ORIGINS = ['https://*/*', 'http://localhost/*', 'http://127.0.0.1/*'];
 
 // Se sustituye en la compilación con `--server=<url>` (para instalaciones propias).
 declare const __DEFAULT_SERVER__: string | undefined;

@@ -20,7 +20,7 @@ const wantZip = process.argv.includes('--zip') || publish;
 
 // --custom-server: permite al usuario elegir otro servidor (instalaciones propias). La versión de las
 // tiendas NO lo incluye: pide un único permiso de host (el servidor de Nexor) y se revisa más rápido.
-const customServer = process.argv.includes('--custom-server');
+// (Ahora el permiso opcional de sitios web va siempre declarado, así que el flag ya no cambia el manifest.)
 const serverArg = process.argv.find((a) => a.startsWith('--server='));
 const SERVER_ORIGIN = serverArg ? new URL(serverArg.slice('--server='.length)).origin : 'https://software-nexor.p08ks6.easypanel.host';
 
@@ -40,7 +40,8 @@ const common = {
   // en la pestaña activa cuando el usuario lo pide (activeTab + scripting).
   permissions: ['storage', 'alarms', 'activeTab', 'scripting'],
   host_permissions: [`${SERVER_ORIGIN}/*`],
-  ...(customServer ? { optional_host_permissions: ['https://*/*', 'http://localhost/*'] } : {}),
+  // Permiso OPCIONAL: solo se pide si el usuario activa "ofrecer guardar contraseñas". Sin él, la extensión no puede ver ninguna web.
+  optional_host_permissions: ['https://*/*', 'http://localhost/*', 'http://127.0.0.1/*'],
   homepage_url: SERVER_ORIGIN,
   commands: {
     'fill-login': {
@@ -91,6 +92,7 @@ async function bundle(outdir) {
   await build({ ...shared, entryPoints: [path.join(here, 'src/background.ts')], outfile: path.join(outdir, 'background.js'), format: 'esm' });
   await build({ ...shared, entryPoints: [path.join(here, 'src/popup/popup.ts')], outfile: path.join(outdir, 'popup.js'), format: 'iife' });
   await build({ ...shared, entryPoints: [path.join(here, 'src/fill.ts')], outfile: path.join(outdir, 'fill.js'), format: 'iife' });
+  await build({ ...shared, entryPoints: [path.join(here, 'src/capture.ts')], outfile: path.join(outdir, 'capture.js'), format: 'iife' });
 }
 
 async function icons(outdir) {

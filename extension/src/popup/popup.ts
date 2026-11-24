@@ -3,7 +3,7 @@
 // secretos: la contraseña y el 2FA se piden uno a uno, por acción del usuario.
 
 import { BIO_MESSAGES, BioError, bioSupported, createBioCredential, getBioPrf, toB64 } from '@/lib/biometric';
-import { DEFAULT_SERVER, type ItemSummary, type Request, type Response, type Status } from '../lib/types';
+import { CAPTURE_ORIGINS, DEFAULT_SERVER, type CaptureOffer, type ItemSummary, type Request, type Response, type Status } from '../lib/types';
 import { normalizeServerUrl } from '../lib/state';
 
 const app = document.getElementById('app') as HTMLElement;
@@ -396,9 +396,87 @@ function itemRow(item: ItemSummary, tabId: number | undefined): HTMLElement {
   );
 }
 
+// Aviso "¿Guardar en Nexor?": vive aquí (no en la página) para que ninguna web pueda tapar ni imitar el botón.
+function offerBanner(offer: CaptureOffer, tabId: number): HTMLElement {
+  const who = offer.username || 'esta cuenta';
+  const question =
+    offer.decision === 'update'
+      ? `¿Actualizar la contraseña de ${who} en ${offer.host}?`
+      : `¿Guardar el acceso de ${who} en ${offer.host}?`;
+
+  const act = (fn: () => Promise<void>) => async (e: Event) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.disabled = true;
+    try {
+      await fn();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'No se pudo completar', true);
+      btn.disabled = false;
+    }
+  };
+
+  return h(
+    'div',
+    { class: 'offer', role: 'group', 'aria-label': 'Guardar contraseña' },
+    h('div', { class: 'offer-text' }, question),
+    h(
+      'div',
+      { class: 'offer-actions' },
+      h(
+        'button',
+        {
+          class: 'btn',
+          type: 'button',
+          onclick: act(async () => {
+            await send({ type: 'capture-save', tabId });
+            toast(offer.decision === 'update' ? 'Contraseña actualizada' : 'Guardado en Nexor');
+            await render();
+          }),
+        },
+        offer.decision === 'update' ? 'Actualizar' : 'Guardar',
+      ),
+      h(
+        'button',
+        {
+          class: 'btn secondary',
+          type: 'button',
+          onclick: act(async () => {
+            await send({ type: 'capture-dismiss', tabId });
+            await render();
+          }),
+        },
+        'Ahora no',
+      ),
+    ),
+    h(
+      'button',
+      {
+        class: 'link-btn',
+        type: 'button',
+        onclick: act(async () => {
+          await send({ type: 'capture-dismiss', tabId, never: true });
+          toast('No volveré a preguntar en esta web');
+          await render();
+        }),
+      },
+      'Nunca en esta web',
+    ),
+  );
+}
+
 async function unlockedView(): Promise<HTMLElement> {
   const tab = await activeTab();
   const { items } = await send<{ items: ItemSummary[] }>({ type: 'items', pageUrl: tab.url });
+
+  const offerBox = h('div', {});
+  if (tab.id !== undefined) {
+    try {
+      const { offer } = await send<{ offer: CaptureOffer | null }>({ type: 'capture-get', tabId: tab.id });
+      if (offer) offerBox.append(offerBanner(offer, tab.id));
+    } catch {
+      /* sin aviso */
+    }
+  }
 
   const list = h('div', {});
   const search = h('input', { type: 'search', class: 'search', placeholder: 'Buscar por nombre, usuario o web…', autofocus: true });
@@ -457,6 +535,31 @@ async function unlockedView(): Promise<HTMLElement> {
         : h('button', { class: 'link-btn', type: 'button', onclick: () => openBioWindow('enroll') }, 'Activar huella / Face ID / llave'),
     );
   }
+  foot.append(
+    h(
+      'button',
+      {
+        class: 'link-btn',
+        type: 'button',
+        title: 'Pide permiso para ver las webs; solo se usa para detectar cuando inicias sesión.',
+        onclick: async () => {
+          try {
+            if (status.captureEnabled) {
+              await chrome.permissions.remove({ origins: CAPTURE_ORIGINS });
+              toast('Aviso de guardado desactivado');
+            } else {
+              const ok = await chrome.permissions.request({ origins: CAPTURE_ORIGINS });
+              toast(ok ? 'Activado: te avisaré al iniciar sesión en una web nueva' : 'No se concedió el permiso', !ok);
+            }
+          } catch {
+            toast('Este navegador no permite cambiarlo desde aquí', true);
+          }
+          await render();
+        },
+      },
+      status.captureEnabled ? 'Desactivar aviso "¿Guardar contraseña?"' : 'Activar aviso "¿Guardar contraseña?"',
+    ),
+  );
   let armed = false;
   foot.append(
     h(
@@ -478,7 +581,7 @@ async function unlockedView(): Promise<HTMLElement> {
       'Cerrar sesión',
     ),
   );
-  return h('main', {}, search, list, foot);
+  return h('main', {}, offerBox, search, list, foot);
 }
 
 // ───────────── arranque ─────────────

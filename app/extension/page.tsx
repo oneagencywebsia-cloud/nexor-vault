@@ -10,6 +10,7 @@ const SECURITY = [
   'Solo rellena si el dominio coincide exactamente con el guardado. Los subdominios piden confirmación explícita.',
   'Nunca rellena en iframes ni en páginas http (salvo localhost).',
   'La clave de tu bóveda vive solo en memoria: se bloquea sola a los 10 minutos y al cerrar el navegador. Nunca se guarda en claro en disco.',
+  'Opcional: activa «¿Guardar contraseña?» en el popup y Nexor te ofrecerá guardar o actualizar un acceso cuando inicies sesión en una web nueva. El aviso sale en el popup (no dentro de la página) y solo se guarda si tú lo confirmas.',
   'Al reabrir el navegador no tienes que iniciar sesión otra vez: solo desbloqueas con tu master password o, si lo activas, con huella, Face ID o llave de seguridad (la clave se guarda cifrada con un secreto que solo tu autenticador puede calcular).',
   'Permisos mínimos: no puede leer tus pestañas ni tu historial; solo actúa sobre la pestaña activa cuando tú se lo pides.',
 ];
