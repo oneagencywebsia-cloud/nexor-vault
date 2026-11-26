@@ -2,15 +2,28 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "Gestiona las contraseñas y los códigos 2FA de tu negocio desde un único lugar. Cifrado en tu dispositivo (zero-knowledge).";
+
 export const metadata: Metadata = {
+  // Las apps de mensajería necesitan la URL completa de la imagen de presentación
+  // (app/opengraph-image.jpg); sin esta base saldría apuntando a localhost.
+  metadataBase: new URL(SITE_URL),
   title: { default: "Nexor Vault", template: "%s · Nexor" },
-  description: "Secure every connection. Vault de contraseñas zero-knowledge por Nexor.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    locale: "es_ES",
+    siteName: SITE_NAME,
+  },
+  twitter: { card: "summary_large_image" },
   applicationName: "Nexor Vault",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
